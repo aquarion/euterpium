@@ -1,0 +1,221 @@
+# config.py — reads settings from the platform-appropriate user config directory
+#
+# Config file location:
+#   Windows : %LOCALAPPDATA%\euterpium\euterpium.ini
+#   Linux   : ~/.config/euterpium/euterpium.ini
+#   macOS   : ~/.config/euterpium/euterpium.ini
+#
+# On first run, the bundled euterpium.ini (next to this file) is copied there
+# as a starting point if no user config exists yet.
+
+import configparser
+import logging
+import os
+import shutil
+
+from platformdirs import user_config_dir
+
+logger = logging.getLogger(__name__)
+
+APP_NAME    = "euterpium"
+CONFIG_FILE = "euterpium.ini"
+
+# Bundled defaults (lives next to this source file)
+_BUNDLED_DEFAULTS = os.path.join(os.path.dirname(__file__), CONFIG_FILE)
+
+# User config path
+_CONFIG_DIR  = user_config_dir(APP_NAME, appauthor=False)
+_CONFIG_PATH = os.path.join(_CONFIG_DIR, CONFIG_FILE)
+
+# Flag set if the config directory/file is not accessible
+_CONFIG_UNAVAILABLE = False
+
+
+def config_path() -> str:
+    """Returns the active config file path (for display in the UI)."""
+    return _CONFIG_PATH
+
+
+def _ensure_config():
+    """Creates the user config dir and seeds it from bundled defaults if needed."""
+    global _CONFIG_UNAVAILABLE
+    try:
+        os.makedirs(_CONFIG_DIR, exist_ok=True)
+        if not os.path.exists(_CONFIG_PATH):
+            if os.path.exists(_BUNDLED_DEFAULTS):
+                shutil.copy2(_BUNDLED_DEFAULTS, _CONFIG_PATH)
+                logger.info(f"Created config at {_CONFIG_PATH}")
+            else:
+                open(_CONFIG_PATH, "w").close()
+                logger.warning("No bundled euterpium.ini found — created empty config")
+    except OSError as e:
+        logger.error(f"Cannot create config directory {_CONFIG_DIR}: {e} — running with defaults only")
+        _CONFIG_UNAVAILABLE = True
+
+
+# Ensure config exists at import time
+_ensure_config()
+
+
+def _load() -> configparser.ConfigParser:
+    """
+    Loads the config file. Returns an empty (defaults-only) parser if the file
+    is missing, unreadable, or contains syntax errors.
+    """
+    cfg = configparser.ConfigParser(inline_comment_prefixes=(";", "#"))
+    if _CONFIG_UNAVAILABLE:
+        return cfg
+    try:
+        cfg.read(_CONFIG_PATH, encoding="utf-8")
+    except (configparser.Error, OSError) as e:
+        logger.error(f"Failed to read config file ({e}) — using built-in defaults")
+    return cfg
+
+
+def _cfg() -> configparser.ConfigParser:
+    """Returns a freshly loaded config (so changes on disk are always reflected)."""
+    return _load()
+
+
+def _getint(cfg: configparser.ConfigParser, section: str, key: str, fallback: int) -> int:
+    """getint with a fallback on ValueError (e.g. non-numeric value in file)."""
+    try:
+        return cfg.getint(section, key, fallback=fallback)
+    except (ValueError, configparser.Error):
+        logger.warning(f"Invalid value for [{section}] {key} — using default ({fallback})")
+        return fallback
+
+
+def _getfloat(cfg: configparser.ConfigParser, section: str, key: str, fallback: float) -> float:
+    """getfloat with a fallback on ValueError."""
+    try:
+        return cfg.getfloat(section, key, fallback=fallback)
+    except (ValueError, configparser.Error):
+        logger.warning(f"Invalid value for [{section}] {key} — using default ({fallback})")
+        return fallback
+
+
+# ── Configured checks ────────────────────────────────────────────────────────
+
+_PLACEHOLDER_URLS = {"", "https://your-api.com/now-playing"}
+
+def acrcloud_is_configured() -> bool:
+    """True if both ACRCloud key and secret are non-empty."""
+    return bool(get_acrcloud_access_key() and get_acrcloud_access_secret())
+
+def api_is_configured() -> bool:
+    """True if the API URL has been set to something other than the placeholder."""
+    return get_api_url() not in _PLACEHOLDER_URLS
+
+def is_configured() -> bool:
+    """True if the minimum required credentials are present to do useful work."""
+    return acrcloud_is_configured() and api_is_configured()
+
+
+# ── ACRCloud ──────────────────────────────────────────────────────────────────
+
+def get_acrcloud_host() -> str:
+    return _cfg().get("acrcloud", "host", fallback="identify-eu-west-1.acrcloud.com")
+
+def get_acrcloud_access_key() -> str:
+    return _cfg().get("acrcloud", "access_key", fallback="")
+
+def get_acrcloud_access_secret() -> str:
+    return _cfg().get("acrcloud", "access_secret", fallback="")
+
+
+# ── Your API ──────────────────────────────────────────────────────────────────
+
+def get_api_url() -> str:
+    return _cfg().get("api", "url", fallback="")
+
+def get_api_key() -> str:
+    return _cfg().get("api", "key", fallback="")
+
+
+# ── Audio ─────────────────────────────────────────────────────────────────────
+
+def get_sample_rate() -> int:
+    return _getint(_cfg(), "audio", "sample_rate", 44100)
+
+def get_capture_seconds() -> float:
+    return _getfloat(_cfg(), "audio", "capture_seconds", 10.0)
+
+def get_poll_interval() -> float:
+    return _getfloat(_cfg(), "audio", "poll_interval", 2.0)
+
+def get_change_threshold() -> float:
+    return _getfloat(_cfg(), "audio", "change_threshold", 0.15)
+
+def get_min_silence_before_change() -> int:
+    return _getint(_cfg(), "audio", "min_silence_before_change", 1)
+
+
+# ── Games ─────────────────────────────────────────────────────────────────────
+
+def get_known_games() -> dict[str, str]:
+    """Returns {process_name: display_name} from the [games] section."""
+    cfg = _cfg()
+    if not cfg.has_section("games"):
+        return {}
+    return dict(cfg.items("games"))
+
+
+# ── Write helper ──────────────────────────────────────────────────────────────
+
+def save(updates: dict[str, dict[str, str]]) -> bool:
+    """
+    Merges updates into the user config file and saves.
+    Returns True on success, False if the file could not be written.
+
+    updates = {
+        "acrcloud": {"access_key": "...", "access_secret": "..."},
+        "api": {"url": "...", "key": "..."},
+        ...
+    }
+    """
+    if _CONFIG_UNAVAILABLE:
+        logger.error("Config directory unavailable — settings cannot be saved")
+        return False
+
+    cfg = _load()
+    for section, values in updates.items():
+        if not cfg.has_section(section):
+            cfg.add_section(section)
+        for key, value in values.items():
+            cfg.set(section, key, value)
+
+    # Write to a temp file then rename, so a failed write doesn't corrupt the existing config
+    tmp_path = _CONFIG_PATH + ".tmp"
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            cfg.write(f)
+        os.replace(tmp_path, _CONFIG_PATH)
+        logger.debug(f"Config saved to {_CONFIG_PATH}")
+        return True
+    except OSError as e:
+        logger.error(f"Failed to save config: {e}")
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        return False
+
+
+# ── Convenience constants (evaluated at import time) ──────────────────────────
+# Use the get_* functions above if you need live values after a settings save.
+
+ACRCLOUD_HOST          = get_acrcloud_host()
+ACRCLOUD_ACCESS_KEY    = get_acrcloud_access_key()
+ACRCLOUD_ACCESS_SECRET = get_acrcloud_access_secret()
+
+YOUR_API_URL = get_api_url()
+YOUR_API_KEY = get_api_key()
+
+SAMPLE_RATE               = get_sample_rate()
+CAPTURE_SECONDS           = get_capture_seconds()
+POLL_INTERVAL             = get_poll_interval()
+CHANGE_THRESHOLD          = get_change_threshold()
+MIN_SILENCE_BEFORE_CHANGE = get_min_silence_before_change()
+
+KNOWN_GAMES = get_known_games()

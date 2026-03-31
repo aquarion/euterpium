@@ -1,0 +1,116 @@
+# ui/tray.py — system tray icon using pystray
+
+import logging
+import os
+from PIL import Image, ImageDraw
+
+logger = logging.getLogger(__name__)
+
+try:
+    import pystray
+    PYSTRAY_AVAILABLE = True
+except ImportError:
+    PYSTRAY_AVAILABLE = False
+    logger.warning("pystray not available — tray icon disabled. Install with: pip install pystray")
+
+
+def _load_icon_image() -> "Image.Image":
+    """
+    Loads icon.png from the project root.
+    Falls back to a generated icon if the file isn't found.
+    """
+    icon_path = os.path.join(os.path.dirname(__file__), "..", "icon.png")
+    icon_path = os.path.normpath(icon_path)
+
+    if os.path.exists(icon_path):
+        img = Image.open(icon_path).convert("RGBA")
+        img = img.resize((64, 64), Image.LANCZOS)
+        return img
+
+    # Fallback: generate the delta-in-circle icon programmatically
+    logger.warning("icon.png not found — using generated fallback icon")
+    size = 64
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 255))
+    draw = ImageDraw.Draw(img)
+    cx, cy, r = size // 2, size // 2, size // 2 - 2
+    draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=(0, 150, 0, 255), width=3)
+    draw.polygon(
+        [(cx, cy - r + 8), (cx - r + 8, cy + r - 8), (cx + r - 8, cy + r - 8)],
+        outline=(0, 150, 0, 255),
+        width=3,
+    )
+    return img
+
+
+class TrayIcon:
+    """
+    Manages the system tray icon.
+    Must be run in the main thread on Windows.
+
+    Callbacks:
+        on_show_window()  — called when user clicks Show Window
+        on_quit()         — called when user clicks Quit
+    """
+
+    def __init__(self, on_show_window, on_show_settings, on_quit):
+        self.on_show_window = on_show_window
+        self.on_show_settings = on_show_settings
+        self.on_quit = on_quit
+        self._icon: "pystray.Icon | None" = None
+        self._current_track_label = "Nothing playing"
+
+    def update_track(self, title: str, artist: str, game_name: str | None = None):
+        """Updates the tray tooltip with the current track."""
+        if title and artist:
+            label = f"{artist} — {title}"
+        elif game_name:
+            label = f"🎮 {game_name} (unrecognised track)"
+        else:
+            label = "Nothing playing"
+
+        if game_name and title:
+            label = f"🎮 {game_name}: {label}"
+
+        self._current_track_label = label[:63]  # Windows tooltip limit
+
+        if self._icon:
+            self._icon.title = self._current_track_label
+            self._update_menu()
+
+    def _update_menu(self):
+        if self._icon:
+            self._icon.menu = self._build_menu()
+
+    def _build_menu(self) -> "pystray.Menu":
+        return pystray.Menu(
+            pystray.MenuItem(self._current_track_label, None, enabled=False),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem("Show window",  lambda: self.on_show_window()),
+            pystray.MenuItem("Settings",     lambda: self.on_show_settings()),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem("Quit", lambda: self._quit()),
+        )
+
+    def _quit(self):
+        if self._icon:
+            self._icon.stop()
+        self.on_quit()
+
+    def run(self):
+        """Starts the tray icon. Blocks until stopped — run in main thread."""
+        if not PYSTRAY_AVAILABLE:
+            logger.warning("pystray unavailable — running without tray icon")
+            # Keep main thread alive without tray
+            import time
+            while True:
+                time.sleep(1)
+            return
+
+        icon_image = _load_icon_image()
+        self._icon = pystray.Icon(
+            name="euterpium",
+            icon=icon_image,
+            title="Euterpium — Nothing playing",
+            menu=self._build_menu(),
+        )
+        self._icon.run()
