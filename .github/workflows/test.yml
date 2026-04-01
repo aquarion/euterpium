@@ -28,7 +28,7 @@ jobs:
       - name: Add Poetry to PATH (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: echo "$env:APPDATA\Python\Scripts" >> $env:GITHUB_PATH
+        run: echo "$env:USERPROFILE\.local\bin" >> $env:GITHUB_PATH
 
       - name: Install dependencies
         run: poetry install --with dev
