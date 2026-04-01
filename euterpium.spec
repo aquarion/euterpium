@@ -14,7 +14,7 @@ a = Analysis(
     datas=[
         # Bundle the default config and icon as data files
         ('euterpium.ini', '.'),
-        ('icon.png',      '.'),
+        ('icons/app_icon.png', '.'),
     ],
     hiddenimports=[
         # tkinter and its sub-modules are sometimes missed
@@ -57,7 +57,7 @@ exe = EXE(  # noqa: F821
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='icon.png',        # taskbar / exe icon
+    icon='icons/app_icon.png',  # taskbar / exe icon
 )
 
 coll = COLLECT(  # noqa: F821
