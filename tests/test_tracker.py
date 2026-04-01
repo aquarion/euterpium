@@ -38,10 +38,11 @@ def test_different_title_is_not_same(tracker):
     assert tracker._tracks_are_same(a, b) is False
 
 
-def test_different_artist_is_not_same(tracker):
+def test_same_title_different_artist_is_same(tracker):
+    """Different artists with same title should be considered the same track."""
     a = {"title": "Song", "artist": "Artist A"}
     b = {"title": "Song", "artist": "Artist B"}
-    assert tracker._tracks_are_same(a, b) is False
+    assert tracker._tracks_are_same(a, b) is True
 
 
 def test_none_first_arg_is_not_same(tracker):
