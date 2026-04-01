@@ -49,6 +49,11 @@ Config is stored at `%LOCALAPPDATA%\euterpium\euterpium.ini`.
 2. **Game running** → WASAPI loopback capture → ACRCloud fingerprint.
 3. **No game** → poll Windows Media Session (SMTC) every N seconds.
 
+### Known limitations
+
+- **Game takes priority over SMTC.** When a known game process is detected, the tracker uses WASAPI + ACRCloud exclusively — SMTC is not polled. Music playing in Spotify alongside a game will not be reported.
+- **Only the current SMTC session is checked.** Windows exposes one "current" session at a time (the most recently active one). If Chrome is playing a video and Spotify is also running, only the current session is seen — the ignore list will filter Chrome out, but Spotify won't be detected as a fallback. If this matters, `smtc.py` would need to iterate `sessions.get_sessions()` instead.
+
 ### SMTC threading note
 
 Python's default `ProactorEventLoop` (IOCP) conflicts with WinRT async callbacks, causing `RPC_E_CALL_CANCELED`. SMTC calls use `asyncio.SelectorEventLoop` explicitly.

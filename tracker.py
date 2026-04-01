@@ -5,6 +5,7 @@ import queue
 import threading
 import time
 
+import config
 from api_client import post_now_playing
 from audio_capture import AudioChangeDetector, audio_to_wav_bytes, capture_audio
 from config import POLL_INTERVAL
@@ -86,7 +87,9 @@ class Tracker:
                 if game:
                     changed = detector.check()
                     if changed:
-                        self._emit("status", f"Audio change in {game['display_name']} — fingerprinting…")
+                        self._emit(
+                            "status", f"Audio change in {game['display_name']} — fingerprinting…"
+                        )
                         audio = capture_audio()
                         if audio is not None:
                             wav = audio_to_wav_bytes(audio)
@@ -113,7 +116,7 @@ class Tracker:
                                     self.last_track = fallback
                                     self._emit("track", fallback, game)
                 else:
-                    track = get_smtc_track_sync()
+                    track = get_smtc_track_sync(ignored_apps=config.get_smtc_ignored_apps())
                     if track and not self._tracks_are_same(track, self.last_track):
                         post_now_playing(track)
                         self.last_track = track

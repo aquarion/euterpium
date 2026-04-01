@@ -20,10 +20,13 @@ except ImportError as e:
     logger.warning(f"winsdk not available ({e}) — SMTC detection disabled. Install with: pip install winsdk")
 
 
-async def get_smtc_track() -> dict | None:
+async def get_smtc_track(ignored_apps: list[str] | None = None) -> dict | None:
     """
     Returns metadata for the currently playing track via Windows Media Session,
     or None if nothing is playing / winsdk is unavailable.
+
+    ignored_apps: list of lowercase substrings — any session whose
+    source_app_user_model_id contains one of these is skipped.
     """
     if not WINSDK_AVAILABLE:
         return None
@@ -35,6 +38,13 @@ async def get_smtc_track() -> dict | None:
         if not current:
             logger.debug("SMTC: no active session")
             return None
+
+        if ignored_apps:
+            app_id = (current.source_app_user_model_id or "").lower()
+            for pattern in ignored_apps:
+                if pattern and pattern in app_id:
+                    logger.debug(f"SMTC: ignoring session from '{app_id}' (matches '{pattern}')")
+                    return None
 
         info = await current.try_get_media_properties_async()
         playback = current.get_playback_info()
@@ -64,7 +74,8 @@ async def get_smtc_track() -> dict | None:
         else:
             artist, album = raw_artist, raw_album
 
-        logger.debug(f"SMTC: found '{artist} — {title}' (album: {album!r})")
+        app_id = current.source_app_user_model_id or "unknown"
+        logger.debug(f"SMTC: found '{artist} — {title}' (album: {album!r}, app: {app_id})")
         return {
             "source": "smtc",
             "title": title,
@@ -77,7 +88,7 @@ async def get_smtc_track() -> dict | None:
         return None
 
 
-def get_smtc_track_sync() -> dict | None:
+def get_smtc_track_sync(ignored_apps: list[str] | None = None) -> dict | None:
     """
     Synchronous wrapper. Explicitly uses SelectorEventLoop rather than the
     Windows-default ProactorEventLoop, because ProactorEventLoop's IOCP
@@ -95,7 +106,7 @@ def get_smtc_track_sync() -> dict | None:
             loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            return loop.run_until_complete(get_smtc_track())
+            return loop.run_until_complete(get_smtc_track(ignored_apps=ignored_apps))
         finally:
             loop.close()
             asyncio.set_event_loop(None)
