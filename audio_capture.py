@@ -5,7 +5,6 @@ import logging
 import wave
 
 import numpy as np
-import soundcard as sc
 
 from config import (
     CAPTURE_SECONDS,
@@ -20,6 +19,7 @@ logger = logging.getLogger(__name__)
 def get_loopback_device():
     """Returns the default speaker's loopback device for capturing system audio."""
     try:
+        import soundcard as sc
         default_speaker = sc.default_speaker()
         loopback = sc.get_microphone(
             id=str(default_speaker.name),

@@ -3,6 +3,7 @@ name = "euterpium"
 version = "0.1.0"
 description = "Music detection and now-playing tracker"
 authors = ["Nicholas <nicholas@istic.net>"]
+package-mode = false
 
 
 [tool.poetry.dependencies]
