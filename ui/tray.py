@@ -14,21 +14,25 @@ except ImportError:
     logger.warning("pystray not available — tray icon disabled. Install with: pip install pystray")
 
 
+def _load_named_icon(filename: str) -> "Image.Image | None":
+    path = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "icons", filename))
+    if os.path.exists(path):
+        img = Image.open(path).convert("RGBA")
+        return img.resize((64, 64), Image.LANCZOS)
+    return None
+
+
 def _load_icon_image() -> "Image.Image":
     """
-    Loads icon.png from the project root.
+    Loads the app icon.
     Falls back to a generated icon if the file isn't found.
     """
-    icon_path = os.path.join(os.path.dirname(__file__), "..", "icon.png")
-    icon_path = os.path.normpath(icon_path)
-
-    if os.path.exists(icon_path):
-        img = Image.open(icon_path).convert("RGBA")
-        img = img.resize((64, 64), Image.LANCZOS)
+    img = _load_named_icon("app_icon.png")
+    if img:
         return img
 
     # Fallback: generate the delta-in-circle icon programmatically
-    logger.warning("icon.png not found — using generated fallback icon")
+    logger.warning("icons/app_icon.png not found — using generated fallback icon")
     size = 64
     img = Image.new("RGBA", (size, size), (0, 0, 0, 255))
     draw = ImageDraw.Draw(img)
@@ -58,6 +62,8 @@ class TrayIcon:
         self.on_quit = on_quit
         self._icon: "pystray.Icon | None" = None
         self._current_track_label = "Nothing playing"
+        self._icon_default: "Image.Image | None" = None
+        self._icon_listening: "Image.Image | None" = None
 
     def update_track(self, title: str, artist: str, game_name: str | None = None):
         """Updates the tray tooltip with the current track."""
@@ -96,6 +102,15 @@ class TrayIcon:
             self._icon.stop()
         self.on_quit()
 
+    def set_listening(self, listening: bool):
+        """Swaps the tray icon to indicate active audio fingerprinting."""
+        if not self._icon:
+            return
+        if listening and self._icon_listening:
+            self._icon.icon = self._icon_listening
+        else:
+            self._icon.icon = self._icon_default
+
     def run(self):
         """Starts the tray icon. Blocks until stopped — run in main thread."""
         if not PYSTRAY_AVAILABLE:
@@ -106,10 +121,11 @@ class TrayIcon:
                 time.sleep(1)
             return
 
-        icon_image = _load_icon_image()
+        self._icon_default = _load_icon_image()
+        self._icon_listening = _load_named_icon("app_listening.png")
         self._icon = pystray.Icon(
             name="euterpium",
-            icon=icon_image,
+            icon=self._icon_default,
             title="Euterpium — Nothing playing",
             menu=self._build_menu(),
         )

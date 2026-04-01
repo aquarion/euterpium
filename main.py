@@ -64,6 +64,7 @@ def main():
 
             if kind == "track":
                 _, track, game = msg
+                tray.set_listening(False)
                 window.update_track(track, game)
                 tray.update_track(
                     title=track.get("title", ""),
@@ -74,6 +75,7 @@ def main():
 
             elif kind == "status":
                 _, message = msg
+                tray.set_listening("fingerprinting" in message.lower())
                 window.log_status(message, level="info")
                 logger.info(message)
 

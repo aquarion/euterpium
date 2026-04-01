@@ -67,9 +67,8 @@ class SettingsWindow:
         win = tk.Toplevel(self._parent)
         win.title("Euterpium — Settings")
         win.configure(bg=BG)
-        win.geometry("520x520")
         win.resizable(True, True)
-        win.minsize(460, 460)
+        win.minsize(460, 400)
         win.grab_set()  # modal
         self._win = win
 

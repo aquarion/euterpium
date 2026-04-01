@@ -1,5 +1,6 @@
 # ui/window.py — tkinter detail window
 
+import os
 import queue
 import tkinter as tk
 from tkinter import ttk
@@ -94,6 +95,14 @@ class MainWindow:
         root.title("Euterpium")
         root.configure(bg=BG)
         root.geometry("520x480")
+
+        icon_path = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "icons", "app_icon.png"))
+        if os.path.exists(icon_path):
+            try:
+                icon_img = tk.PhotoImage(file=icon_path)
+                root.iconphoto(True, icon_img)
+            except Exception:
+                pass
         root.resizable(True, True)
         root.minsize(400, 360)
 

@@ -13,7 +13,7 @@ except ImportError:
     logger.warning("win11toast not available — notifications disabled. Install with: pip install win11toast")
 
 _ICON_PATH = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "icon.png")
+    os.path.join(os.path.dirname(__file__), "..", "icons", "app_icon.png")
 )
 
 
