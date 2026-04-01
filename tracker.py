@@ -5,9 +5,9 @@ import queue
 import threading
 import time
 
+import config
 from api_client import post_now_playing
 from audio_capture import AudioChangeDetector, audio_to_wav_bytes, capture_audio
-import config
 from config import POLL_INTERVAL
 from fingerprint import identify_audio
 from game_detector import get_running_game
@@ -87,7 +87,9 @@ class Tracker:
                 if game:
                     changed = detector.check()
                     if changed:
-                        self._emit("status", f"Audio change in {game['display_name']} — fingerprinting…")
+                        self._emit(
+                            "status", f"Audio change in {game['display_name']} — fingerprinting…"
+                        )
                         audio = capture_audio()
                         if audio is not None:
                             wav = audio_to_wav_bytes(audio)
