@@ -68,10 +68,8 @@ class Tracker:
     def _tracks_are_same(self, a: dict | None, b: dict | None) -> bool:
         if a is None or b is None:
             return False
-        return (
-            a.get("title", "").lower() == b.get("title", "").lower()
-            and a.get("artist", "").lower() == b.get("artist", "").lower()
-        )
+        # Only compare titles - artist metadata can vary for the same track
+        return a.get("title", "").lower() == b.get("title", "").lower()
 
     def _run(self):
         detector = AudioChangeDetector()
