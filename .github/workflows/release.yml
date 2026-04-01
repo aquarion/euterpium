@@ -38,6 +38,10 @@ jobs:
           virtualenvs-create: true
           virtualenvs-in-project: true
 
+      - name: Add Poetry to PATH
+        shell: pwsh
+        run: echo "$env:USERPROFILE\.local\bin" >> $env:GITHUB_PATH
+
       - name: Install dependencies
         run: poetry install --with dev
 
