@@ -104,13 +104,6 @@ jobs:
 
           ${COMMITS}
 
-          ## Docker Image
-
-          \`\`\`bash
-          docker pull ghcr.io/${{ github.repository }}:${NEXT_VERSION#v}
-          docker pull ghcr.io/${{ github.repository }}:latest
-          \`\`\`
-
           **Full Changelog**: https://github.com/${{ github.repository }}/compare/${LATEST_TAG}...${NEXT_VERSION}
           EOF
 
@@ -128,7 +121,7 @@ jobs:
 
   deploy:
     needs: [tag]
-    uses: aquarion/stream-delta/.github/workflows/deploy-production.yml@main
+    uses: aquarion/stream-delta/.github/workflows/release.yml@main
     with:
       deploy_version: ${{ needs.tag.outputs.next_version }}
-    secrets: inherit  # pragma: allowlist secret
+    secrets: inherit # pragma: allowlist secret
