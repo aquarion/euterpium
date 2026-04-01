@@ -108,13 +108,9 @@ class Tracker:
                                         "title": "",
                                         "artist": "",
                                         "_game": game,
-                                    }
-                                    post_now_playing(
-                                        {"source": "game_only", "title": "", "artist": ""},
-                                        game=game,
-                                    )
-                                    self.last_track = fallback
-                                    self._emit("track", fallback, game)
+                                   
+.last_track = fallback
+  ("track", fallback, game)
                 else:
                     track = get_smtc_track_sync(ignored_apps=config.get_smtc_ignored_apps())
                     if track and not self._tracks_are_same(track, self.last_track):
