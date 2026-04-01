@@ -147,30 +147,233 @@ class SettingsWindow:
         self._acr_host   = tk.StringVar(value=config.get_acrcloud_host())
         self._acr_key    = tk.StringVar(value=config.get_acrcloud_access_key())
         self._acr_secret = tk.StringVar(value=config.get_acrcloud_access_secret())
-        self._api_url    = tk.StringVar(value=config.get_api_url())
-        self._api_key    = tk.StringVar(value=config.get_api_key())
 
-        fields = [
-            ("ACRCloud", None,            None),
+        # ACRCloud section
+        tk.Label(parent, text="ACRCLOUD", bg=BG_CARD,
+                 fg=TEXT_DIM, font=("Segoe UI", 8, "bold")).pack(anchor="w", pady=(10, 2))
+        for label, var, secret in [
             ("Host",          self._acr_host,   False),
             ("Access Key",    self._acr_key,    False),
             ("Access Secret", self._acr_secret, True),
-            (None,            None,             None),
-            ("Your API",      None,             None),
-            ("Endpoint URL",  self._api_url,    False),
-            ("API Key",       self._api_key,    True),
-        ]
-
-        for label, var, secret in fields:
-            if var is None:
-                # Section heading or spacer
-                if label:
-                    tk.Label(parent, text=label.upper(), bg=BG_CARD,
-                             fg=TEXT_DIM, font=("Segoe UI", 8, "bold")).pack(anchor="w", pady=(10, 2))
-                continue
-
+        ]:
             _styled_label(parent, label).pack(anchor="w", pady=(6, 1))
             _styled_entry(parent, var, show="•" if secret else None).pack(anchor="w")
+
+        # API profiles section
+        tk.Label(parent, text="YOUR API", bg=BG_CARD,
+                 fg=TEXT_DIM, font=("Segoe UI", 8, "bold")).pack(anchor="w", pady=(16, 2))
+
+        # State: {name: {url: StringVar, key: StringVar}}
+        self._api_profiles: dict[str, dict[str, tk.StringVar]] = {}
+        self._active_profile = tk.StringVar(value=config.get_active_profile())
+
+        for name, vals in config.get_api_profiles().items():
+            self._api_profiles[name] = {
+                "url": tk.StringVar(value=vals["url"]),
+                "key": tk.StringVar(value=vals["key"]),
+            }
+
+        # Left column: profile list + controls
+        cols = tk.Frame(parent, bg=BG_CARD)
+        cols.pack(fill="both", expand=True, pady=(4, 0))
+
+        list_col = tk.Frame(cols, bg=BG_CARD)
+        list_col.pack(side="left", fill="y", padx=(0, 10))
+
+        self._profile_listbox = tk.Listbox(
+            list_col,
+            bg=BG_INPUT, fg=TEXT,
+            selectbackground=ACCENT, selectforeground=BG,
+            font=("Segoe UI", 10),
+            relief="flat", bd=4,
+            width=12, height=6,
+            exportselection=False,
+        )
+        self._profile_listbox.pack(fill="x")
+        self._profile_listbox.bind("<<ListboxSelect>>", self._on_profile_select)
+
+        # Right column: URL + key for selected profile
+        detail_col = tk.Frame(cols, bg=BG_CARD)
+        detail_col.pack(side="left", fill="both", expand=True)
+
+        self._profile_name_label = tk.Label(
+            detail_col, text="", bg=BG_CARD,
+            fg=ACCENT, font=("Segoe UI", 9, "bold"),
+        )
+        self._profile_name_label.pack(anchor="w")
+
+        self._detail_url_var = tk.StringVar()
+        self._detail_key_var = tk.StringVar()
+
+        _styled_label(detail_col, "Endpoint URL").pack(anchor="w", pady=(6, 1))
+        self._detail_url_entry = _styled_entry(detail_col, self._detail_url_var, width=30)
+        self._detail_url_entry.pack(anchor="w")
+
+        _styled_label(detail_col, "API Key").pack(anchor="w", pady=(6, 1))
+        self._detail_key_entry = _styled_entry(detail_col, self._detail_key_var, show="•", width=30)
+        self._detail_key_entry.pack(anchor="w")
+
+        self._detail_url_var.trace_add("write", self._sync_detail_to_profile)
+        self._detail_key_var.trace_add("write", self._sync_detail_to_profile)
+
+        self._active_label = _styled_label(detail_col, "", dim=True)
+        self._active_label.pack(anchor="w", pady=(6, 0))
+
+        # Profile action buttons — horizontal row below both columns
+        btn_row = tk.Frame(parent, bg=BG_CARD)
+        btn_row.pack(fill="x", pady=(4, 0))
+
+        for text, cmd in [("+ Add", self._add_profile), ("Rename", self._rename_profile), ("− Remove", self._remove_profile), ("Set Active", self._set_active_profile)]:
+            tk.Button(
+                btn_row, text=text,
+                bg=BG_CARD, fg=TEXT_DIM,
+                font=("Segoe UI", 8),
+                relief="flat", bd=0, cursor="hand2",
+                activebackground=BG_CARD, activeforeground=ACCENT,
+                command=cmd,
+            ).pack(side="left", padx=(0, 8))
+
+        self._selected_profile: str | None = None
+        self._detail_syncing = False
+
+        self._refresh_profile_list()
+
+    def _refresh_profile_list(self):
+        self._profile_listbox.delete(0, "end")
+        active = self._active_profile.get()
+        for name in self._api_profiles:
+            display = f"{name} ✓" if name == active else name
+            self._profile_listbox.insert("end", display)
+
+        # Re-select the previously selected item
+        if self._selected_profile and self._selected_profile in self._api_profiles:
+            idx = list(self._api_profiles.keys()).index(self._selected_profile)
+            self._profile_listbox.selection_set(idx)
+            self._show_profile(self._selected_profile)
+        elif self._api_profiles:
+            self._profile_listbox.selection_set(0)
+            self._show_profile(next(iter(self._api_profiles)))
+
+    def _on_profile_select(self, _event=None):
+        sel = self._profile_listbox.curselection()
+        if not sel:
+            return
+        name = list(self._api_profiles.keys())[sel[0]]
+        self._show_profile(name)
+
+    def _show_profile(self, name: str):
+        self._selected_profile = name
+        vars_ = self._api_profiles[name]
+        self._detail_syncing = True
+        self._detail_url_var.set(vars_["url"].get())
+        self._detail_key_var.set(vars_["key"].get())
+        self._detail_syncing = False
+        active = self._active_profile.get()
+        self._profile_name_label.config(text=name)
+        self._active_label.config(
+            text="(active)" if name == active else ""
+        )
+
+    def _sync_detail_to_profile(self, *_):
+        if self._detail_syncing or not self._selected_profile:
+            return
+        if self._selected_profile in self._api_profiles:
+            self._api_profiles[self._selected_profile]["url"].set(self._detail_url_var.get())
+            self._api_profiles[self._selected_profile]["key"].set(self._detail_key_var.get())
+
+    def _add_profile(self):
+        dialog = tk.Toplevel(self._win)
+        dialog.title("Add Profile")
+        dialog.configure(bg=BG)
+        dialog.geometry("260x100")
+        dialog.resizable(False, False)
+        dialog.grab_set()
+
+        name_var = tk.StringVar()
+        _styled_label(dialog, "Profile name:", dim=False).pack(anchor="w", padx=12, pady=(12, 2))
+        entry = _styled_entry(dialog, name_var, width=28)
+        entry.pack(anchor="w", padx=12)
+        entry.focus_set()
+
+        def confirm():
+            name = name_var.get().strip()
+            if not name or name in self._api_profiles:
+                return
+            self._api_profiles[name] = {"url": tk.StringVar(), "key": tk.StringVar()}
+            self._refresh_profile_list()
+            dialog.destroy()
+
+        entry.bind("<Return>", lambda _: confirm())
+        tk.Button(
+            dialog, text="Add",
+            bg=ACCENT, fg=BG,
+            font=("Segoe UI", 9, "bold"),
+            relief="flat", bd=0, cursor="hand2",
+            activebackground=ACCENT,
+            command=confirm,
+        ).pack(anchor="e", padx=12, pady=8)
+
+    def _rename_profile(self):
+        if not self._selected_profile:
+            return
+        old_name = self._selected_profile
+
+        dialog = tk.Toplevel(self._win)
+        dialog.title("Rename Profile")
+        dialog.configure(bg=BG)
+        dialog.geometry("260x100")
+        dialog.resizable(False, False)
+        dialog.grab_set()
+
+        name_var = tk.StringVar(value=old_name)
+        _styled_label(dialog, "New name:", dim=False).pack(anchor="w", padx=12, pady=(12, 2))
+        entry = _styled_entry(dialog, name_var, width=28)
+        entry.pack(anchor="w", padx=12)
+        entry.selection_range(0, "end")
+        entry.focus_set()
+
+        def confirm():
+            new_name = name_var.get().strip()
+            if not new_name or new_name == old_name:
+                dialog.destroy()
+                return
+            if new_name in self._api_profiles:
+                return
+            # Rebuild dict preserving order
+            self._api_profiles = {
+                (new_name if k == old_name else k): v
+                for k, v in self._api_profiles.items()
+            }
+            if self._active_profile.get() == old_name:
+                self._active_profile.set(new_name)
+            self._selected_profile = new_name
+            self._refresh_profile_list()
+            dialog.destroy()
+
+        entry.bind("<Return>", lambda _: confirm())
+        tk.Button(
+            dialog, text="Rename",
+            bg=ACCENT, fg=BG,
+            font=("Segoe UI", 9, "bold"),
+            relief="flat", bd=0, cursor="hand2",
+            activebackground=ACCENT,
+            command=confirm,
+        ).pack(anchor="e", padx=12, pady=8)
+
+    def _remove_profile(self):
+        if not self._selected_profile:
+            return
+        if self._selected_profile == self._active_profile.get():
+            messagebox.showwarning("Cannot remove", "Cannot remove the active profile.", parent=self._win)
+            return
+        del self._api_profiles[self._selected_profile]
+        self._selected_profile = None
+        self._refresh_profile_list()
+
+    def _set_active_profile(self):
+        if self._selected_profile:
+            self._active_profile.set(self._selected_profile)
+            self._refresh_profile_list()
 
     # ── Audio tab ─────────────────────────────────────────────────────────────
 
@@ -263,16 +466,20 @@ class SettingsWindow:
                 proc, _, name = line.partition("=")
                 games[proc.strip()] = name.strip()
 
+        api_sections = {"api": {"active": self._active_profile.get()}}
+        for name, vars_ in self._api_profiles.items():
+            api_sections[f"api:{name}"] = {
+                "url": vars_["url"].get().strip(),
+                "key": vars_["key"].get().strip(),
+            }
+
         ok = config.save({
             "acrcloud": {
                 "host":          self._acr_host.get().strip(),
                 "access_key":    self._acr_key.get().strip(),
                 "access_secret": self._acr_secret.get().strip(),
             },
-            "api": {
-                "url": self._api_url.get().strip(),
-                "key": self._api_key.get().strip(),
-            },
+            **api_sections,
             "audio": {
                 "poll_interval":             str(poll),
                 "capture_seconds":           str(capture),

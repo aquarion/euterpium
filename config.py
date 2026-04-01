@@ -126,11 +126,41 @@ def get_acrcloud_access_secret() -> str:
 
 # ── Your API ──────────────────────────────────────────────────────────────────
 
-def get_api_url() -> str:
-    return _cfg().get("api", "url", fallback="")
+def get_active_profile() -> str:
+    return _cfg().get("api", "active", fallback="")
 
-def get_api_key() -> str:
-    return _cfg().get("api", "key", fallback="")
+def get_api_profiles() -> dict[str, dict[str, str]]:
+    """Returns {profile_name: {url, key}} for all [api:*] sections."""
+    cfg = _cfg()
+    profiles = {}
+    for section in cfg.sections():
+        if section.startswith("api:"):
+            name = section[4:]
+            profiles[name] = {
+                "url": cfg.get(section, "url", fallback=""),
+                "key": cfg.get(section, "key", fallback=""),
+            }
+    return profiles
+
+def get_api_url(profile: str | None = None) -> str:
+    if profile is None:
+        profile = get_active_profile()
+    cfg = _cfg()
+    section = f"api:{profile}"
+    if cfg.has_section(section):
+        return cfg.get(section, "url", fallback="")
+    # Legacy fallback: single [api] url
+    return cfg.get("api", "url", fallback="")
+
+def get_api_key(profile: str | None = None) -> str:
+    if profile is None:
+        profile = get_active_profile()
+    cfg = _cfg()
+    section = f"api:{profile}"
+    if cfg.has_section(section):
+        return cfg.get(section, "key", fallback="")
+    # Legacy fallback: single [api] key
+    return cfg.get("api", "key", fallback="")
 
 
 # ── Audio ─────────────────────────────────────────────────────────────────────
@@ -202,6 +232,29 @@ def save(updates: dict[str, dict[str, str]]) -> bool:
         return False
 
 
+def _migrate_legacy_api():
+    """
+    Migrates a single-endpoint [api] url/key config to [api:dev] on first load.
+    Leaves the file unchanged if [api:*] sections already exist.
+    """
+    cfg = _load()
+    has_profiles = any(s.startswith("api:") for s in cfg.sections())
+    if has_profiles:
+        return
+    legacy_url = cfg.get("api", "url", fallback="")
+    legacy_key = cfg.get("api", "key", fallback="")
+    if not legacy_url or legacy_url in _PLACEHOLDER_URLS:
+        return
+    logger.info("Migrating legacy [api] url/key to [api:dev]")
+    save({
+        "api": {"active": "dev"},
+        "api:dev": {"url": legacy_url, "key": legacy_key},
+    })
+
+
+_migrate_legacy_api()
+
+
 # ── Convenience constants (evaluated at import time) ──────────────────────────
 # Use the get_* functions above if you need live values after a settings save.
 
@@ -209,8 +262,9 @@ ACRCLOUD_HOST          = get_acrcloud_host()
 ACRCLOUD_ACCESS_KEY    = get_acrcloud_access_key()
 ACRCLOUD_ACCESS_SECRET = get_acrcloud_access_secret()
 
-YOUR_API_URL = get_api_url()
-YOUR_API_KEY = get_api_key()
+YOUR_API_URL     = get_api_url()
+YOUR_API_KEY     = get_api_key()
+ACTIVE_PROFILE   = get_active_profile()
 
 SAMPLE_RATE               = get_sample_rate()
 CAPTURE_SECONDS           = get_capture_seconds()
