@@ -9,7 +9,13 @@ on:
       deploy_version:
         description: "Version to deploy (e.g. v1.2.3)"
         required: true
-        default: "v0.1.0"
+  # Allows other workflows to call this workflow directly
+  workflow_call:
+    inputs:
+      deploy_version:
+        description: "Tag to deploy"
+        required: true
+        type: string
 
 permissions:
   contents: write
