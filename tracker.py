@@ -56,6 +56,62 @@ class Tracker:
         self._paused = False
         self._emit("status", "Tracker resumed")
 
+    def force_fingerprint(self):
+        """Force an immediate fingerprint attempt (manual trigger)."""
+        if not self.is_running:
+            self._emit("error", "Tracker not running")
+            return
+
+        threading.Thread(target=self._manual_fingerprint, daemon=True).start()
+
+    def _manual_fingerprint(self):
+        """Manual fingerprint logic (runs in separate thread)."""
+        try:
+            self._emit("status", "Manual fingerprinting requested...")
+
+            game = get_running_game()
+            if not game:
+                self._emit("status", "No game running — checking SMTC instead")
+                track = get_smtc_track_sync(ignored_apps=config.get_smtc_ignored_apps())
+                if track:
+                    if not self._tracks_are_same(track, self.last_track):
+                        post_now_playing(track)
+                        self.last_track = track
+                        self._emit("track", track, None)
+                    else:
+                        self._emit("status", "Same track detected — no change")
+                else:
+                    self._emit("status", "No media playing")
+                return
+
+            # Game is running - try fingerprinting
+            self._emit("status", f"Fingerprinting audio from {game['display_name']}...")
+            audio = capture_audio()
+            if audio is None:
+                self._emit("error", "Failed to capture audio")
+                return
+
+            wav = audio_to_wav_bytes(audio)
+            track = identify_audio(wav)
+
+            if track:
+                if not self._tracks_are_same(track, self.last_track):
+                    post_now_playing(track, game=game)
+                    self.last_track = track
+                    self._emit("track", track, game)
+                    self._emit(
+                        "status",
+                        f"Identified: {track.get('artist', '?')} - {track.get('title', '?')}",
+                    )
+                else:
+                    self._emit("status", "Same track detected — no change")
+            else:
+                self._emit("status", f"No match found in {game['display_name']}")
+
+        except Exception as e:
+            logger.error(f"Manual fingerprint error: {e}", exc_info=True)
+            self._emit("error", f"Fingerprint failed: {e}")
+
     @property
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
