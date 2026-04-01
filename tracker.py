@@ -33,6 +33,8 @@ class Tracker:
         self._thread: threading.Thread | None = None
         self._paused = False
         self.last_track: dict | None = None
+        self._last_track_lock = threading.Lock()
+        self._manual_fingerprint_running = False
 
     # ── Public controls ────────────────────────────────────────────────────
 

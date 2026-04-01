@@ -45,6 +45,34 @@ def test_same_title_different_artist_is_same(tracker):
     assert tracker._tracks_are_same(a, b) is True
 
 
+def test_same_title_different_source_is_different(tracker):
+    """Same title from different sources should be considered different tracks."""
+    a = {"title": "Song", "source": "smtc"}
+    b = {"title": "Song", "source": "acrcloud"}
+    assert tracker._tracks_are_same(a, b) is False
+
+
+def test_same_title_different_game_is_different(tracker):
+    """Same title from different games should be considered different tracks."""
+    a = {"title": "Song", "_game": {"display_name": "Game A"}}
+    b = {"title": "Song", "_game": {"display_name": "Game B"}}
+    assert tracker._tracks_are_same(a, b) is False
+
+
+def test_same_title_one_game_missing_is_same(tracker):
+    """Same title with only one having game info should be considered same track."""
+    a = {"title": "Song", "_game": {"display_name": "Game A"}}
+    b = {"title": "Song"}
+    assert tracker._tracks_are_same(a, b) is True
+
+
+def test_same_title_same_source_same_game_is_same(tracker):
+    """Same title, source, and game should be considered same track."""
+    a = {"title": "Song", "source": "acrcloud", "_game": {"display_name": "Game A"}}
+    b = {"title": "Song", "source": "acrcloud", "_game": {"display_name": "Game A"}}
+    assert tracker._tracks_are_same(a, b) is True
+
+
 def test_none_first_arg_is_not_same(tracker):
     assert tracker._tracks_are_same(None, {"title": "Song", "artist": "A"}) is False
 
