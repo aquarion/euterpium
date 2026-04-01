@@ -7,6 +7,7 @@ import time
 
 from api_client import post_now_playing
 from audio_capture import AudioChangeDetector, audio_to_wav_bytes, capture_audio
+import config
 from config import POLL_INTERVAL
 from fingerprint import identify_audio
 from game_detector import get_running_game
@@ -113,7 +114,7 @@ class Tracker:
                                     self.last_track = fallback
                                     self._emit("track", fallback, game)
                 else:
-                    track = get_smtc_track_sync()
+                    track = get_smtc_track_sync(ignored_apps=config.get_smtc_ignored_apps())
                     if track and not self._tracks_are_same(track, self.last_track):
                         post_now_playing(track)
                         self.last_track = track

@@ -131,14 +131,17 @@ class SettingsWindow:
 
         creds_tab  = ttk.Frame(nb, padding=16)
         audio_tab  = ttk.Frame(nb, padding=16)
+        media_tab  = ttk.Frame(nb, padding=16)
         games_tab  = ttk.Frame(nb, padding=16)
 
         nb.add(creds_tab, text="Credentials")
         nb.add(audio_tab, text="Audio")
+        nb.add(media_tab, text="Media")
         nb.add(games_tab, text="Games")
 
         self._build_credentials(creds_tab)
         self._build_audio(audio_tab)
+        self._build_media(media_tab)
         self._build_games(games_tab)
 
     # ── Credentials tab ───────────────────────────────────────────────────────
@@ -403,6 +406,41 @@ class SettingsWindow:
             _styled_entry(parent, var, width=12).pack(anchor="w")
             _styled_label(parent, hint, dim=True).pack(anchor="w")
 
+    # ── Media tab ─────────────────────────────────────────────────────────────
+
+    def _build_media(self, parent):
+        _styled_label(
+            parent,
+            "Ignored media apps — one name per line",
+            dim=False,
+        ).pack(anchor="w", pady=(0, 2))
+        _styled_label(
+            parent,
+            "Any Windows media session whose app ID contains this text is skipped (case-insensitive).",
+            dim=True,
+        ).pack(anchor="w", pady=(0, 6))
+
+        frame = tk.Frame(parent, bg=BG_CARD)
+        frame.pack(fill="both", expand=True)
+
+        scrollbar = ttk.Scrollbar(frame)
+        scrollbar.pack(side="right", fill="y")
+
+        self._media_ignore_text = tk.Text(
+            frame,
+            bg=BG_INPUT, fg=TEXT,
+            insertbackground=TEXT,
+            font=("Consolas", 10),
+            relief="flat", bd=4,
+            yscrollcommand=scrollbar.set,
+            wrap="none",
+        )
+        self._media_ignore_text.pack(fill="both", expand=True)
+        scrollbar.config(command=self._media_ignore_text.yview)
+
+        for entry in config.get_smtc_ignored_apps():
+            self._media_ignore_text.insert("end", f"{entry}\n")
+
     # ── Games tab ─────────────────────────────────────────────────────────────
 
     def _build_games(self, parent):
@@ -456,6 +494,13 @@ class SettingsWindow:
             messagebox.showerror("Invalid settings", str(e), parent=self._win)
             return
 
+        # Parse media ignore list
+        ignored = [
+            line.strip().lower()
+            for line in self._media_ignore_text.get("1.0", "end").splitlines()
+            if line.strip() and not line.strip().startswith(";")
+        ]
+
         # Parse games text box
         games = {}
         for line in self._games_text.get("1.0", "end").splitlines():
@@ -486,6 +531,7 @@ class SettingsWindow:
                 "change_threshold":          str(thresh),
                 "min_silence_before_change": str(silence),
             },
+            "smtc": {"ignore": ", ".join(ignored)},
             "games": games,
         })
 

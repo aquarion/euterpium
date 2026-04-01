@@ -191,6 +191,17 @@ def get_known_games() -> dict[str, str]:
     return dict(cfg.items("games"))
 
 
+# ── SMTC ──────────────────────────────────────────────────────────────────────
+
+def get_smtc_ignored_apps() -> list[str]:
+    """
+    Returns a list of lowercase substrings. Any SMTC session whose
+    source_app_user_model_id contains one of these is ignored.
+    """
+    raw = _cfg().get("smtc", "ignore", fallback="chrome.exe,firefox.exe")
+    return [s.strip().lower() for s in raw.split(",") if s.strip()]
+
+
 # ── Write helper ──────────────────────────────────────────────────────────────
 
 def save(updates: dict[str, dict[str, str]]) -> bool:
