@@ -1,7 +1,9 @@
 # game_detector.py — detects known running game processes
 
 import logging
+
 import psutil
+
 from config import KNOWN_GAMES
 
 logger = logging.getLogger(__name__)

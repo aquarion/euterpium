@@ -13,10 +13,10 @@ import sys
 
 async def main():
     try:
+        from winsdk.windows.media import MediaPlaybackStatus
         from winsdk.windows.media.control import (
             GlobalSystemMediaTransportControlsSessionManager as MediaManager,
         )
-        from winsdk.windows.media import MediaPlaybackStatus
     except ImportError as e:
         print(f"ERROR: winsdk not available: {e}")
         print("Install with:  pip install winsdk")

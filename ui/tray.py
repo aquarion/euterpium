@@ -2,6 +2,7 @@
 
 import logging
 import os
+
 from PIL import Image, ImageDraw
 
 logger = logging.getLogger(__name__)
@@ -60,10 +61,10 @@ class TrayIcon:
         self.on_show_window = on_show_window
         self.on_show_settings = on_show_settings
         self.on_quit = on_quit
-        self._icon: "pystray.Icon | None" = None
+        self._icon: pystray.Icon | None = None
         self._current_track_label = "Nothing playing"
-        self._icon_default: "Image.Image | None" = None
-        self._icon_listening: "Image.Image | None" = None
+        self._icon_default: Image.Image | None = None
+        self._icon_listening: Image.Image | None = None
 
     def update_track(self, title: str, artist: str, game_name: str | None = None):
         """Updates the tray tooltip with the current track."""

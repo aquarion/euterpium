@@ -1,6 +1,7 @@
 # api_client.py — posts now-playing data to your API
 
 import logging
+
 import requests
 
 import config

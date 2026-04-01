@@ -3,15 +3,15 @@
 import io
 import logging
 import wave
+
 import numpy as np
 import soundcard as sc
 
 from config import (
-    SAMPLE_RATE,
     CAPTURE_SECONDS,
-    POLL_INTERVAL,
     CHANGE_THRESHOLD,
     MIN_SILENCE_BEFORE_CHANGE,
+    SAMPLE_RATE,
 )
 
 logger = logging.getLogger(__name__)

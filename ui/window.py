@@ -1,12 +1,12 @@
 # ui/window.py — tkinter detail window
 
+import logging
 import os
 import queue
-import tkinter as tk
-from tkinter import ttk
 import threading
-import logging
+import tkinter as tk
 from datetime import datetime
+from tkinter import ttk
 
 from ui.settings_window import SettingsWindow
 

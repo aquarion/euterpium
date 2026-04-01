@@ -9,10 +9,10 @@ import sys
 logger = logging.getLogger(__name__)
 
 try:
+    from winsdk.windows.media import MediaPlaybackStatus
     from winsdk.windows.media.control import (
         GlobalSystemMediaTransportControlsSessionManager as MediaManager,
     )
-    from winsdk.windows.media import MediaPlaybackStatus
     WINSDK_AVAILABLE = True
     logger.info("winsdk loaded — SMTC detection enabled")
 except ImportError as e:

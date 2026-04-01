@@ -1,0 +1,22 @@
+name: "[Auto] Merge Dependabot Updates"
+
+on:
+  workflow_run:
+    workflows: ["Laravel Unit Tests"]
+    types:
+      - completed
+    branches-ignore:
+      - 'main'
+jobs:
+  automerge:
+    runs-on: ubuntu-latest
+
+    permissions:
+      pull-requests: write
+      contents: write
+
+    steps:
+      - uses: fastify/github-action-merge-dependabot@v3
+        with:
+          merge-method: squash
+          use-github-auto-merge: true

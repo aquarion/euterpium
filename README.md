@@ -36,9 +36,9 @@ Config is stored at `%LOCALAPPDATA%\euterpium\euterpium.ini`.
 | `fingerprint.py` | ACRCloud audio fingerprinting |
 | `audio_capture.py` | WASAPI loopback capture + audio change detection |
 | `game_detector.py` | Detects known game processes via psutil |
-| `api_client.py` | Posts to the configured API endpoint |
-| `config.py` | INI config read/write with graceful error handling |
-| `ui/tray.py` | System tray icon (pystray) |
+| `api_client.py` | Posts to the active API profile endpoint |
+| `config.py` | INI config read/write with multi-profile API support |
+| `ui/tray.py` | System tray icon (pystray) — swaps icon when fingerprinting |
 | `ui/window.py` | Main tkinter window |
 | `ui/settings_window.py` | Tabbed settings dialog |
 | `ui/notifications.py` | Windows toast notifications (win11toast) |
@@ -59,9 +59,30 @@ Apple Music for Windows has two SMTC quirks handled in `smtc.py`:
 - Reports playback status as `PAUSED` even when actively playing — treated as playing if track metadata is present.
 - Packs `"Artist — Album"` into the artist field and leaves `album_title` empty — split on the em dash.
 
-## API
+## API profiles
 
-Euterpium POSTs JSON to the configured endpoint on every track change.
+Euterpium supports multiple named API profiles (dev/stage/live, or any name you choose), switchable from the Settings window without editing the config file.
+
+Profiles are stored as `[api:name]` sections in the INI file:
+
+```ini
+[api]
+active = live
+
+[api:dev]
+url = http://localhost:8000/webhooks/euterpium
+key =
+
+[api:live]
+url = https://example.com/webhooks/euterpium
+key = your-secret-key
+```
+
+If you have an older config with a single `[api] url/key`, it is automatically migrated to `[api:dev]` on first launch.
+
+## API payload
+
+Euterpium POSTs JSON to the active profile's endpoint on every track change.
 
 ```json
 {
@@ -99,7 +120,7 @@ When a known game process is running, a `game` object is added regardless of sou
 }
 ```
 
-If an API key is set in config, requests include an `Authorization: Bearer <key>` header.
+If an API key is set in the active profile, requests include an `Authorization: Bearer <key>` header.
 
 ## Tools / utilities
 
@@ -107,4 +128,12 @@ If an API key is set in config, requests include an `Authorization: Bearer <key>
 
 ```
 poetry run python smtc_debug.py
+```
+
+## Development
+
+```
+poetry install
+poetry run pytest          # run tests
+poetry run ruff check .    # lint
 ```

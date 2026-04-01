@@ -209,6 +209,7 @@ __marimo__/
 # Virtual environments
 .venv/
 venv/
+.direnv/
 
 # User config (don't commit real credentials)
 euterpium.ini.local

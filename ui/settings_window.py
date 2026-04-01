@@ -5,7 +5,7 @@ import os
 import subprocess
 import sys
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import messagebox, ttk
 
 import config
 

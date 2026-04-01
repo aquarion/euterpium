@@ -5,6 +5,13 @@ import os
 import queue
 import threading
 
+import config
+import smtc
+from tracker import Tracker
+from ui.notifications import notify_track
+from ui.tray import TrayIcon
+from ui.window import MainWindow
+
 # Configure logging before any local imports so module-level log messages
 # (e.g. winsdk availability) are captured from the start
 logging.basicConfig(
@@ -15,13 +22,7 @@ logging.basicConfig(
 logging.getLogger("smtc").setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-import config
-import smtc
-from tracker import Tracker
-from ui.tray import TrayIcon
-from ui.window import MainWindow
-from ui.settings_window import SettingsWindow
-from ui.notifications import notify_track
+
 
 
 def main():
@@ -43,13 +44,13 @@ def main():
         # Settings window must open in the tkinter thread
         window._queue.put(("open_settings",))
 
-    window   = MainWindow(on_quit=on_quit, on_show_settings=on_show_settings)
-    tray     = TrayIcon(
+    window = MainWindow(on_quit=on_quit, on_show_settings=on_show_settings)
+    tray = TrayIcon(
         on_show_window=lambda: window.show(),
         on_show_settings=on_show_settings,
         on_quit=on_quit,
     )
-    tracker  = Tracker(event_queue=event_queue)
+    tracker = Tracker(event_queue=event_queue)
 
     # ── Event pump: moves tracker events → window + tray ─────────────────
 
@@ -105,7 +106,9 @@ def main():
     # On first launch (or if credentials were wiped), open Settings immediately
     if not config.is_configured():
         logger.info("Credentials not configured — opening Settings")
-        window.log_status("Welcome! Please enter your credentials in Settings to get started.", level="info")
+        window.log_status(
+            "Welcome! Please enter your credentials in Settings to get started.", level="info"
+        )
         on_show_settings()
 
     # Tray runs in main thread (required by pystray on Windows) — blocks here

@@ -6,11 +6,11 @@ import threading
 import time
 
 from api_client import post_now_playing
-from audio_capture import AudioChangeDetector, capture_audio, audio_to_wav_bytes
+from audio_capture import AudioChangeDetector, audio_to_wav_bytes, capture_audio
+from config import POLL_INTERVAL
 from fingerprint import identify_audio
 from game_detector import get_running_game
 from smtc import get_smtc_track_sync
-from config import POLL_INTERVAL
 
 logger = logging.getLogger(__name__)
 
