@@ -121,6 +121,8 @@ jobs:
 
   deploy:
     needs: [tag]
+    permissions:
+      contents: write
     uses: aquarion/euterpium/.github/workflows/release.yml@main
     with:
       deploy_version: ${{ needs.tag.outputs.next_version }}
