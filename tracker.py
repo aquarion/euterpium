@@ -97,7 +97,7 @@ class Tracker:
                 self._emit("status", "No game running — checking SMTC instead")
                 track = get_smtc_track_sync(ignored_apps=config.get_smtc_ignored_apps())
                 if track:
-                    if self._try_set_last_track(track):
+                    if self._try_set_last_track(track, game=None):
                         post_now_playing(track)
                         self._emit("track", track, None)
                     else:
@@ -118,7 +118,7 @@ class Tracker:
                 track = identify_audio(wav)
 
             if track:
-                if self._try_set_last_track(track):
+                if self._try_set_last_track(track, game=game):
                     post_now_playing(track, game=game)
                     self._emit("track", track, game)
                     self._emit(
@@ -143,12 +143,16 @@ class Tracker:
     def _emit(self, event_type: str, *args):
         self.event_queue.put((event_type, *args))
 
-    def _try_set_last_track(self, track: dict) -> bool:
+    def _try_set_last_track(self, track: dict, game: dict | None = None) -> bool:
         """Atomically update last_track if the new track is meaningfully different."""
+        track_state = dict(track)
+        if game is not None:
+            track_state["_game"] = game
+
         with self._last_track_lock:
-            if self._tracks_are_same(track, self.last_track):
+            if self._tracks_are_same(track_state, self.last_track):
                 return False
-            self.last_track = track
+            self.last_track = track_state
             return True
 
     def _tracks_are_same(self, a: dict | None, b: dict | None) -> bool:
@@ -201,6 +205,7 @@ class Tracker:
                             "status", f"Audio change in {game['display_name']} — fingerprinting…"
                         )
                         if not self._fingerprint_lock.acquire(blocking=False):
+                            time.sleep(POLL_INTERVAL)
                             continue
 
                         try:
@@ -210,7 +215,7 @@ class Tracker:
                                 track = identify_audio(wav)
 
                                 if track:
-                                    if self._try_set_last_track(track):
+                                    if self._try_set_last_track(track, game=game):
                                         post_now_playing(track, game=game)
                                         self._emit("track", track, game)
                                 else:
@@ -234,7 +239,7 @@ class Tracker:
                             self._fingerprint_lock.release()
                 else:
                     track = get_smtc_track_sync(ignored_apps=config.get_smtc_ignored_apps())
-                    if track and self._try_set_last_track(track):
+                    if track and self._try_set_last_track(track, game=None):
                         post_now_playing(track)
                         self._emit("track", track, None)
                     elif not track:
