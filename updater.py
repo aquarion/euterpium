@@ -155,12 +155,12 @@ def download_installer(update: AvailableUpdate, destination_dir: str | Path | No
     target_path = target_dir / installer_name
 
     try:
-        response = requests.get(update.installer_url, stream=True, timeout=REQUEST_TIMEOUT)
-        response.raise_for_status()
-        with target_path.open("wb") as handle:
-            for chunk in response.iter_content(chunk_size=1024 * 64):
-                if chunk:
-                    handle.write(chunk)
+        with requests.get(update.installer_url, stream=True, timeout=REQUEST_TIMEOUT) as response:
+            response.raise_for_status()
+            with target_path.open("wb") as handle:
+                for chunk in response.iter_content(chunk_size=1024 * 64):
+                    if chunk:
+                        handle.write(chunk)
     except requests.RequestException as exc:
         raise UpdateError(f"Failed to download installer: {exc}") from exc
     except OSError as exc:
@@ -223,6 +223,11 @@ class UpdateManager:
                 self._emit("status", f"Euterpium {self.current_version} is up to date")
         except UpdateError as exc:
             logger.warning("Update check failed: %s", exc)
+            # Clear stale update state so the UI doesn't keep showing an outdated
+            # "Install update" item after a failed check.
+            with self._lock:
+                self._available_update = None
+            self._emit("update_checked", None)
             if manual:
                 self._emit("error", f"Update check failed: {exc}")
         finally:

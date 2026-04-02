@@ -94,6 +94,12 @@ def test_download_installer_writes_file(monkeypatch, tmp_path):
             yield b"hello"
             yield b"world"
 
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
     monkeypatch.setattr(updater.requests, "get", lambda *args, **kwargs: Response())
     update = updater.AvailableUpdate(
         version="0.3.0",
@@ -155,3 +161,21 @@ def test_update_manager_reports_available_update(monkeypatch):
 
     assert ("update_checked", expected_update) in events
     assert ("update_available", expected_update) in events
+
+
+def test_update_manager_emits_update_checked_on_error(monkeypatch):
+    events = []
+    event_queue = type("Queue", (), {"put": lambda self, item: events.append(item)})()
+    manager = updater.UpdateManager(event_queue=event_queue, current_version="0.1.0")
+
+    def raise_error(current_version):
+        raise updater.UpdateError("network failure")
+
+    monkeypatch.setattr(updater, "fetch_latest_update", raise_error)
+
+    manager._check_worker(manual=False)
+
+    # update_checked must always be emitted so the UI can clear stale state
+    assert ("update_checked", None) in events
+    # No update_available should be emitted on error
+    assert not any(e[0] == "update_available" for e in events)
