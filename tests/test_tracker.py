@@ -112,12 +112,14 @@ def test_different_sources_are_not_same(tracker):
 
 
 @patch("tracker.config.get_acrcloud_host")
-@patch("tracker.config.get_acrcloud_access_key")
-def test_manual_fingerprint_requires_acrcloud_config(mock_access_key, mock_host, running_tracker):
+@patch("tracker.config.acrcloud_is_configured")
+def test_manual_fingerprint_requires_acrcloud_config(
+    mock_is_configured, mock_host, running_tracker
+):
     """Manual fingerprint should fail if ACRCloud is not configured."""
     # Mock missing configuration
     mock_host.return_value = None
-    mock_access_key.return_value = "key"
+    mock_is_configured.return_value = False
 
     events = []
 
@@ -132,12 +134,12 @@ def test_manual_fingerprint_requires_acrcloud_config(mock_access_key, mock_host,
     # Should emit error about missing ACRCloud config
     error_events = [e for e in events if e[0] == "error"]
     assert len(error_events) > 0
-    assert "ACRCloud not configured" in error_events[0][1]
+    assert "ACRCloud not fully configured" in error_events[0][1]
 
 
 @patch("tracker.config.get_acrcloud_host", return_value="host")
-@patch("tracker.config.get_acrcloud_access_key", return_value="key")
-def test_manual_fingerprint_debouncing(mock_access_key, mock_host, running_tracker):
+@patch("tracker.config.acrcloud_is_configured", return_value=True)
+def test_manual_fingerprint_debouncing(mock_is_configured, mock_host, running_tracker):
     """Multiple rapid manual fingerprint calls should be debounced."""
     events = []
 
@@ -162,11 +164,11 @@ def test_manual_fingerprint_debouncing(mock_access_key, mock_host, running_track
 
 
 @patch("tracker.config.get_acrcloud_host", return_value="host")
-@patch("tracker.config.get_acrcloud_access_key", return_value="key")
+@patch("tracker.config.acrcloud_is_configured", return_value=True)
 @patch("tracker.get_running_game")
 @patch("tracker.get_smtc_track_sync")
 def test_manual_fingerprint_smtc_fallback(
-    mock_smtc, mock_game, mock_access_key, mock_host, running_tracker
+    mock_smtc, mock_game, mock_is_configured, mock_host, running_tracker
 ):
     """Manual fingerprint should fall back to SMTC when no game is running."""
     mock_game.return_value = None  # No game running
@@ -188,11 +190,11 @@ def test_manual_fingerprint_smtc_fallback(
 
 
 @patch("tracker.config.get_acrcloud_host", return_value="host")
-@patch("tracker.config.get_acrcloud_access_key", return_value="key")
+@patch("tracker.config.acrcloud_is_configured", return_value=True)
 @patch("tracker.get_running_game")
 @patch("tracker.capture_audio")
 def test_manual_fingerprint_audio_capture_failure(
-    mock_capture, mock_game, mock_access_key, mock_host, running_tracker
+    mock_capture, mock_game, mock_is_configured, mock_host, running_tracker
 ):
     """Manual fingerprint should handle audio capture failures gracefully."""
     mock_game.return_value = {"display_name": "Test Game", "name": "test"}
@@ -236,3 +238,8 @@ def test_manual_fingerprint_thread_safety(tracker):
     # All threads should see the same initial track
     assert all(r == {"title": "Initial Track"} for r in results)
     assert len(results) == 5
+
+
+def test_is_running_returns_bool_when_stopped(tracker):
+    assert tracker.is_running is False
+    assert isinstance(tracker.is_running, bool)
