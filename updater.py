@@ -134,6 +134,9 @@ def fetch_latest_update(current_version: str) -> AvailableUpdate | None:
 
 def download_installer(update: AvailableUpdate, destination_dir: str | Path | None = None) -> Path:
     """Download the installer for the given update and return the local file path."""
+    # Validate the URL even if the caller didn't go through parse_latest_release().
+    _validate_installer_url(update.installer_url)
+
     target_dir = Path(destination_dir or tempfile.mkdtemp(prefix="euterpium-update-"))
     target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -212,6 +215,8 @@ class UpdateManager:
             with self._lock:
                 self._available_update = update
 
+            # Always emit update_checked so the UI can clear any stale update state.
+            self._emit("update_checked", update)
             if update:
                 self._emit("update_available", update)
             elif manual:

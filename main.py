@@ -103,9 +103,13 @@ def main():
                 window.log_status(message, level="error")
                 logger.error(message)
 
+            elif kind == "update_checked":
+                _, update = msg
+                # Always sync tray state — clears stale "Install update" when update is None.
+                tray.set_available_update(update)
+
             elif kind == "update_available":
                 _, update = msg
-                tray.set_available_update(update)
                 window.log_status(f"Update available: Euterpium {update.version}", level="info")
                 logger.info("Update available: Euterpium %s", update.version)
                 notify_update_available(update.version)

@@ -97,9 +97,9 @@ def test_download_installer_writes_file(monkeypatch, tmp_path):
     monkeypatch.setattr(updater.requests, "get", lambda *args, **kwargs: Response())
     update = updater.AvailableUpdate(
         version="0.3.0",
-        release_url="https://example.com/release",
+        release_url="https://github.com/aquarion/euterpium/releases/tag/v0.3.0",
         installer_name="euterpium-v0.3.0-setup.exe",
-        installer_url="https://example.com/setup.exe",
+        installer_url="https://objects.githubusercontent.com/aquarion/euterpium/releases/download/v0.3.0/euterpium-v0.3.0-setup.exe",
     )
 
     path = updater.download_installer(update, tmp_path)
@@ -153,4 +153,5 @@ def test_update_manager_reports_available_update(monkeypatch):
 
     manager._check_worker(manual=True)
 
+    assert ("update_checked", expected_update) in events
     assert ("update_available", expected_update) in events
