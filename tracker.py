@@ -58,12 +58,22 @@ class Tracker:
         self._paused = False
         self._emit("status", "Tracker resumed")
 
+    @property
+    def is_running(self):
+        """Check if tracker is currently running."""
+        return self._thread and self._thread.is_alive() and not self._stop_event.is_set()
+
     def force_fingerprint(self):
         """Force an immediate fingerprint attempt (manual trigger)."""
         if not self.is_running:
             self._emit("error", "Tracker not running")
             return
-
+        # Debounce - prevent overlapping manual fingerprints
+        with self._last_track_lock:
+            if self._manual_fingerprint_running:
+                self._emit("status", "Manual fingerprinting already in progress")
+                return
+            self._manual_fingerprint_running = True
         threading.Thread(target=self._manual_fingerprint, daemon=True).start()
 
     def _manual_fingerprint(self):
@@ -71,14 +81,22 @@ class Tracker:
         try:
             self._emit("status", "Manual fingerprinting requested...")
 
+            # Check ACRCloud configuration
+            if not config.get_acrcloud_host() or not config.get_acrcloud_access_key():
+                self._emit("error", "ACRCloud not configured — check settings")
+                return
+
             game = get_running_game()
             if not game:
                 self._emit("status", "No game running — checking SMTC instead")
                 track = get_smtc_track_sync(ignored_apps=config.get_smtc_ignored_apps())
                 if track:
-                    if not self._tracks_are_same(track, self.last_track):
+                    with self._last_track_lock:
+                        current_track = self.last_track
+                    if not self._tracks_are_same(track, current_track):
                         post_now_playing(track)
-                        self.last_track = track
+                        with self._last_track_lock:
+                            self.last_track = track
                         self._emit("track", track, None)
                     else:
                         self._emit("status", "Same track detected — no change")
@@ -97,9 +115,12 @@ class Tracker:
             track = identify_audio(wav)
 
             if track:
-                if not self._tracks_are_same(track, self.last_track):
+                with self._last_track_lock:
+                    current_track = self.last_track
+                if not self._tracks_are_same(track, current_track):
                     post_now_playing(track, game=game)
-                    self.last_track = track
+                    with self._last_track_lock:
+                        self.last_track = track
                     self._emit("track", track, game)
                     self._emit(
                         "status",
@@ -113,10 +134,10 @@ class Tracker:
         except Exception as e:
             logger.error(f"Manual fingerprint error: {e}", exc_info=True)
             self._emit("error", f"Fingerprint failed: {e}")
-
-    @property
-    def is_running(self) -> bool:
-        return self._thread is not None and self._thread.is_alive()
+        finally:
+            # Always reset the running flag
+            with self._last_track_lock:
+                self._manual_fingerprint_running = False
 
     # ── Internal ───────────────────────────────────────────────────────────
 
@@ -126,8 +147,28 @@ class Tracker:
     def _tracks_are_same(self, a: dict | None, b: dict | None) -> bool:
         if a is None or b is None:
             return False
-        # Only compare titles - artist metadata can vary for the same track
-        return a.get("title", "").lower() == b.get("title", "").lower()
+
+        # Compare titles (case-insensitive)
+        if a.get("title", "").lower() != b.get("title", "").lower():
+            return False
+
+        # Compare sources - different sources means different tracks
+        if a.get("source") != b.get("source"):
+            return False
+
+        # Compare games - same title from different games is different
+        a_game = a.get("_game")
+        b_game = b.get("_game")
+        if a_game != b_game:
+            # Handle None cases
+            if a_game is None or b_game is None:
+                return a_game == b_game
+            # Compare game identifiers (prefer display_name, fall back to name)
+            a_game_id = a_game.get("display_name") or a_game.get("name")
+            b_game_id = b_game.get("display_name") or b_game.get("name")
+            return a_game_id == b_game_id
+
+        return True
 
     def _run(self):
         detector = AudioChangeDetector()
@@ -152,13 +193,18 @@ class Tracker:
                             track = identify_audio(wav)
 
                             if track:
-                                if not self._tracks_are_same(track, self.last_track):
+                                with self._last_track_lock:
+                                    current_track = self.last_track
+                                if not self._tracks_are_same(track, current_track):
                                     post_now_playing(track, game=game)
-                                    self.last_track = track
+                                    with self._last_track_lock:
+                                        self.last_track = track
                                     self._emit("track", track, game)
                             else:
                                 self._emit("status", f"No match found in {game['display_name']}")
-                                if not (self.last_track and self.last_track.get("_game") == game):
+                                with self._last_track_lock:
+                                    current_track = self.last_track
+                                if not (current_track and current_track.get("_game") == game):
                                     fallback = {
                                         "source": "game_only",
                                         "title": "",
@@ -166,16 +212,21 @@ class Tracker:
                                         "_game": game,
                                     }
                                     # Don't post_now_playing for unidentified tracks
-                                    self.last_track = fallback
+                                    with self._last_track_lock:
+                                        self.last_track = fallback
                                     self._emit("track", fallback, game)
                 else:
                     track = get_smtc_track_sync(ignored_apps=config.get_smtc_ignored_apps())
-                    if track and not self._tracks_are_same(track, self.last_track):
+                    with self._last_track_lock:
+                        current_track = self.last_track
+                    if track and not self._tracks_are_same(track, current_track):
                         post_now_playing(track)
-                        self.last_track = track
+                        with self._last_track_lock:
+                            self.last_track = track
                         self._emit("track", track, None)
-                    elif not track and self.last_track is not None:
-                        self.last_track = None
+                    elif not track and current_track is not None:
+                        with self._last_track_lock:
+                            self.last_track = None
                         self._emit("status", "Playback stopped")
 
             except Exception as e:
