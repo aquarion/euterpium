@@ -68,6 +68,9 @@ jobs:
         run: |
           $tag = $env:DEPLOY_VERSION
           $version = $tag.TrimStart('v')
+          if (-not ($version -match '^\d+\.\d+\.\d+$')) {
+            throw "Invalid deploy_version '$tag'. Expected semantic version like v1.2.3 or 1.2.3"
+          }
           $content = Get-Content version.py -Raw
           $content = $content -replace '__version__ = ".*"', "__version__ = `"$version`""
           Set-Content version.py $content
@@ -77,13 +80,21 @@ jobs:
       - name: Build with PyInstaller
         run: poetry run pyinstaller euterpium.spec
 
-      - name: Install Inno Setup
-        run: choco install innosetup --version=6.3.3 --no-progress -y
+      - name: Install Inno Setup (pinned)
+        run: choco install innosetup --version=6.7.1 --allow-downgrade --no-progress -y
 
       - name: Build installer
         shell: pwsh
         run: |
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DAppVersion=$env:APP_VERSION" "/DReleaseTag=$env:RELEASE_TAG" euterpium.iss
+          $isccCandidates = @(
+            "C:\Program Files\Inno Setup 6\ISCC.exe",
+            "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          )
+          $iscc = $isccCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) {
+            throw "ISCC.exe not found in expected locations"
+          }
+          & $iscc "/DAppVersion=$env:APP_VERSION" "/DReleaseTag=$env:RELEASE_TAG" euterpium.iss
 
       - name: Zip the build
         run: |
