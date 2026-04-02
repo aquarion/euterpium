@@ -10,6 +10,7 @@ import re
 import shutil
 import tempfile
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
@@ -305,13 +306,11 @@ class UpdateManager:
             self._emit("status", f"Downloading Euterpium {update.version} installer...")
             installer_path = download_installer(update, tmp_dir)
             launch_installer(installer_path)
+            # Give the installer process a short head-start, then clean up temp files
+            # synchronously before listeners potentially hard-exit the app.
+            time.sleep(2)
+            shutil.rmtree(tmp_dir, ignore_errors=True)
             self._emit("update_installer_launched", update, str(installer_path))
-            # Schedule temp dir cleanup after a delay to give the installer time to unpack.
-            cleanup_timer = threading.Timer(
-                60.0, shutil.rmtree, args=[tmp_dir], kwargs={"ignore_errors": True}
-            )
-            cleanup_timer.daemon = True
-            cleanup_timer.start()
         except UpdateError as exc:
             shutil.rmtree(tmp_dir, ignore_errors=True)
             logger.warning("Update install failed: %s", exc)

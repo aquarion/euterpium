@@ -48,12 +48,25 @@ jobs:
       - name: Run tests
         run: poetry run pytest --tb=short -q
 
-      - name: Set release version
+      - name: Set release version from tag
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag.TrimStart('v')
+          $content = Get-Content version.py -Raw
+          $content = $content -replace '__version__ = ".*"', "__version__ = `"$version`""
+          Set-Content version.py $content
+          echo "APP_VERSION=$version" >> $env:GITHUB_ENV
+          echo "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
+
+      - name: Set release version from input
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
         shell: pwsh
         env:
           DEPLOY_VERSION: ${{ inputs.deploy_version }}
         run: |
-          $tag = if ($env:DEPLOY_VERSION -ne "") { $env:DEPLOY_VERSION } else { "${{ github.ref_name }}" }
+          $tag = $env:DEPLOY_VERSION
           $version = $tag.TrimStart('v')
           $content = Get-Content version.py -Raw
           $content = $content -replace '__version__ = ".*"', "__version__ = `"$version`""
