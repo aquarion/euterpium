@@ -17,14 +17,14 @@ from platformdirs import user_config_dir
 
 logger = logging.getLogger(__name__)
 
-APP_NAME    = "euterpium"
+APP_NAME = "euterpium"
 CONFIG_FILE = "euterpium.ini"
 
 # Bundled defaults (lives next to this source file)
 _BUNDLED_DEFAULTS = os.path.join(os.path.dirname(__file__), CONFIG_FILE)
 
 # User config path
-_CONFIG_DIR  = user_config_dir(APP_NAME, appauthor=False)
+_CONFIG_DIR = user_config_dir(APP_NAME, appauthor=False)
 _CONFIG_PATH = os.path.join(_CONFIG_DIR, CONFIG_FILE)
 
 # Flag set if the config directory/file is not accessible
@@ -49,7 +49,9 @@ def _ensure_config():
                 open(_CONFIG_PATH, "w").close()
                 logger.warning("No bundled euterpium.ini found — created empty config")
     except OSError as e:
-        logger.error(f"Cannot create config directory {_CONFIG_DIR}: {e} — running with defaults only")
+        logger.error(
+            f"Cannot create config directory {_CONFIG_DIR}: {e} — running with defaults only"
+        )
         _CONFIG_UNAVAILABLE = True
 
 
@@ -99,13 +101,16 @@ def _getfloat(cfg: configparser.ConfigParser, section: str, key: str, fallback: 
 
 _PLACEHOLDER_URLS = {"", "https://your-api.com/now-playing"}
 
+
 def acrcloud_is_configured() -> bool:
     """True if both ACRCloud key and secret are non-empty."""
     return bool(get_acrcloud_access_key() and get_acrcloud_access_secret())
 
+
 def api_is_configured() -> bool:
     """True if the API URL has been set to something other than the placeholder."""
     return get_api_url() not in _PLACEHOLDER_URLS
+
 
 def is_configured() -> bool:
     """True if the minimum required credentials are present to do useful work."""
@@ -114,11 +119,14 @@ def is_configured() -> bool:
 
 # ── ACRCloud ──────────────────────────────────────────────────────────────────
 
+
 def get_acrcloud_host() -> str:
     return _cfg().get("acrcloud", "host", fallback="identify-eu-west-1.acrcloud.com")
 
+
 def get_acrcloud_access_key() -> str:
     return _cfg().get("acrcloud", "access_key", fallback="")
+
 
 def get_acrcloud_access_secret() -> str:
     return _cfg().get("acrcloud", "access_secret", fallback="")
@@ -126,8 +134,10 @@ def get_acrcloud_access_secret() -> str:
 
 # ── Your API ──────────────────────────────────────────────────────────────────
 
+
 def get_active_profile() -> str:
     return _cfg().get("api", "active", fallback="")
+
 
 def get_api_profiles() -> dict[str, dict[str, str]]:
     """Returns {profile_name: {url, key}} for all [api:*] sections."""
@@ -142,6 +152,7 @@ def get_api_profiles() -> dict[str, dict[str, str]]:
             }
     return profiles
 
+
 def get_api_url(profile: str | None = None) -> str:
     if profile is None:
         profile = get_active_profile()
@@ -151,6 +162,7 @@ def get_api_url(profile: str | None = None) -> str:
         return cfg.get(section, "url", fallback="")
     # Legacy fallback: single [api] url
     return cfg.get("api", "url", fallback="")
+
 
 def get_api_key(profile: str | None = None) -> str:
     if profile is None:
@@ -165,23 +177,29 @@ def get_api_key(profile: str | None = None) -> str:
 
 # ── Audio ─────────────────────────────────────────────────────────────────────
 
+
 def get_sample_rate() -> int:
     return _getint(_cfg(), "audio", "sample_rate", 44100)
+
 
 def get_capture_seconds() -> float:
     return _getfloat(_cfg(), "audio", "capture_seconds", 10.0)
 
+
 def get_poll_interval() -> float:
-    return _getfloat(_cfg(), "audio", "poll_interval", 2.0)
+    return _getfloat(_cfg(), "audio", "poll_interval", 1.0)
+
 
 def get_change_threshold() -> float:
-    return _getfloat(_cfg(), "audio", "change_threshold", 0.15)
+    return _getfloat(_cfg(), "audio", "change_threshold", 0.08)
+
 
 def get_min_silence_before_change() -> int:
-    return _getint(_cfg(), "audio", "min_silence_before_change", 1)
+    return _getint(_cfg(), "audio", "min_silence_before_change", 2)
 
 
 # ── Games ─────────────────────────────────────────────────────────────────────
+
 
 def get_known_games() -> dict[str, str]:
     """Returns {process_name: display_name} from the [games] section."""
@@ -193,6 +211,7 @@ def get_known_games() -> dict[str, str]:
 
 # ── SMTC ──────────────────────────────────────────────────────────────────────
 
+
 def get_smtc_ignored_apps() -> list[str]:
     """
     Returns a list of lowercase substrings. Any SMTC session whose
@@ -203,6 +222,7 @@ def get_smtc_ignored_apps() -> list[str]:
 
 
 # ── Write helper ──────────────────────────────────────────────────────────────
+
 
 def save(updates: dict[str, dict[str, str]]) -> bool:
     """
@@ -257,10 +277,12 @@ def _migrate_legacy_api():
     if not legacy_url or legacy_url in _PLACEHOLDER_URLS:
         return
     logger.info("Migrating legacy [api] url/key to [api:dev]")
-    save({
-        "api": {"active": "dev"},
-        "api:dev": {"url": legacy_url, "key": legacy_key},
-    })
+    save(
+        {
+            "api": {"active": "dev"},
+            "api:dev": {"url": legacy_url, "key": legacy_key},
+        }
+    )
 
 
 _migrate_legacy_api()
@@ -269,18 +291,18 @@ _migrate_legacy_api()
 # ── Convenience constants (evaluated at import time) ──────────────────────────
 # Use the get_* functions above if you need live values after a settings save.
 
-ACRCLOUD_HOST          = get_acrcloud_host()
-ACRCLOUD_ACCESS_KEY    = get_acrcloud_access_key()
+ACRCLOUD_HOST = get_acrcloud_host()
+ACRCLOUD_ACCESS_KEY = get_acrcloud_access_key()
 ACRCLOUD_ACCESS_SECRET = get_acrcloud_access_secret()
 
-YOUR_API_URL     = get_api_url()
-YOUR_API_KEY     = get_api_key()
-ACTIVE_PROFILE   = get_active_profile()
+YOUR_API_URL = get_api_url()
+YOUR_API_KEY = get_api_key()
+ACTIVE_PROFILE = get_active_profile()
 
-SAMPLE_RATE               = get_sample_rate()
-CAPTURE_SECONDS           = get_capture_seconds()
-POLL_INTERVAL             = get_poll_interval()
-CHANGE_THRESHOLD          = get_change_threshold()
+SAMPLE_RATE = get_sample_rate()
+CAPTURE_SECONDS = get_capture_seconds()
+POLL_INTERVAL = get_poll_interval()
+CHANGE_THRESHOLD = get_change_threshold()
 MIN_SILENCE_BEFORE_CHANGE = get_min_silence_before_change()
 
 KNOWN_GAMES = get_known_games()

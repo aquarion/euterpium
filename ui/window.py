@@ -13,14 +13,14 @@ from ui.settings_window import SettingsWindow
 logger = logging.getLogger(__name__)
 
 # Colour palette
-BG         = "#1e1e2e"
-BG_CARD    = "#2a2a3e"
-ACCENT     = "#cba6f7"   # soft purple
-TEXT_MAIN  = "#cdd6f4"
-TEXT_DIM   = "#6c7086"
+BG = "#1e1e2e"
+BG_CARD = "#2a2a3e"
+ACCENT = "#cba6f7"  # soft purple
+TEXT_MAIN = "#cdd6f4"
+TEXT_DIM = "#6c7086"
 TEXT_GREEN = "#a6e3a1"
-TEXT_RED   = "#f38ba8"
-TEXT_GOLD  = "#f9e2af"
+TEXT_RED = "#f38ba8"
+TEXT_GOLD = "#f9e2af"
 
 
 class MainWindow:
@@ -30,9 +30,10 @@ class MainWindow:
     Thread-safe: call update_track() and log_status() from any thread.
     """
 
-    def __init__(self, on_quit, on_show_settings=None):
+    def __init__(self, on_quit, on_show_settings=None, on_fingerprint_now=None):
         self.on_quit = on_quit
         self.on_show_settings = on_show_settings
+        self.on_fingerprint_now = on_fingerprint_now
         self._root: tk.Tk | None = None
         self._visible = False
         self._queue: queue.Queue = queue.Queue()
@@ -96,7 +97,9 @@ class MainWindow:
         root.configure(bg=BG)
         root.geometry("520x480")
 
-        icon_path = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "icons", "app_icon.png"))
+        icon_path = os.path.normpath(
+            os.path.join(os.path.dirname(__file__), "..", "icons", "app_icon.png")
+        )
         if os.path.exists(icon_path):
             try:
                 icon_img = tk.PhotoImage(file=icon_path)
@@ -110,31 +113,28 @@ class MainWindow:
         card = tk.Frame(root, bg=BG_CARD, padx=20, pady=16)
         card.pack(fill="x", padx=16, pady=(16, 8))
 
-        tk.Label(card, text="NOW PLAYING", font=("Segoe UI", 8, "bold"),
-                 bg=BG_CARD, fg=TEXT_DIM).pack(anchor="w")
+        tk.Label(
+            card, text="NOW PLAYING", font=("Segoe UI", 8, "bold"), bg=BG_CARD, fg=TEXT_DIM
+        ).pack(anchor="w")
 
         self._lbl_title = tk.Label(
-            card, text="—", font=("Segoe UI", 18, "bold"),
-            bg=BG_CARD, fg=TEXT_MAIN, wraplength=460, justify="left"
+            card,
+            text="—",
+            font=("Segoe UI", 18, "bold"),
+            bg=BG_CARD,
+            fg=TEXT_MAIN,
+            wraplength=460,
+            justify="left",
         )
         self._lbl_title.pack(anchor="w", pady=(4, 0))
 
-        self._lbl_artist = tk.Label(
-            card, text="", font=("Segoe UI", 12),
-            bg=BG_CARD, fg=ACCENT
-        )
+        self._lbl_artist = tk.Label(card, text="", font=("Segoe UI", 12), bg=BG_CARD, fg=ACCENT)
         self._lbl_artist.pack(anchor="w")
 
-        self._lbl_album = tk.Label(
-            card, text="", font=("Segoe UI", 10),
-            bg=BG_CARD, fg=TEXT_DIM
-        )
+        self._lbl_album = tk.Label(card, text="", font=("Segoe UI", 10), bg=BG_CARD, fg=TEXT_DIM)
         self._lbl_album.pack(anchor="w")
 
-        self._lbl_source = tk.Label(
-            card, text="", font=("Segoe UI", 9),
-            bg=BG_CARD, fg=TEXT_DIM
-        )
+        self._lbl_source = tk.Label(card, text="", font=("Segoe UI", 9), bg=BG_CARD, fg=TEXT_DIM)
         self._lbl_source.pack(anchor="w", pady=(6, 0))
 
         # ── Status bar (packed before list so it's always visible) ──────────
@@ -142,8 +142,9 @@ class MainWindow:
         status_bar.pack(fill="x", side="bottom")
 
         # ── Recent tracks ─────────────────────────────────────────────────
-        tk.Label(root, text="RECENT TRACKS", font=("Segoe UI", 8, "bold"),
-                 bg=BG, fg=TEXT_DIM).pack(anchor="w", padx=16, pady=(4, 2))
+        tk.Label(root, text="RECENT TRACKS", font=("Segoe UI", 8, "bold"), bg=BG, fg=TEXT_DIM).pack(
+            anchor="w", padx=16, pady=(4, 2)
+        )
 
         list_frame = tk.Frame(root, bg=BG)
         list_frame.pack(fill="both", expand=True, padx=16, pady=(0, 8))
@@ -153,9 +154,11 @@ class MainWindow:
 
         self._history_box = tk.Text(
             list_frame,
-            bg=BG_CARD, fg=TEXT_MAIN,
+            bg=BG_CARD,
+            fg=TEXT_MAIN,
             font=("Segoe UI", 10),
-            relief="flat", bd=0,
+            relief="flat",
+            bd=0,
             state="disabled",
             yscrollcommand=scrollbar.set,
             cursor="arrow",
@@ -165,42 +168,65 @@ class MainWindow:
         scrollbar.config(command=self._history_box.yview)
 
         # Tag colours for log levels
-        self._history_box.tag_config("track",  foreground=TEXT_MAIN)
-        self._history_box.tag_config("game",   foreground=TEXT_GOLD)
-        self._history_box.tag_config("info",   foreground=TEXT_DIM)
-        self._history_box.tag_config("error",  foreground=TEXT_RED)
-        self._history_box.tag_config("dim",    foreground=TEXT_DIM)
+        self._history_box.tag_config("track", foreground=TEXT_MAIN)
+        self._history_box.tag_config("game", foreground=TEXT_GOLD)
+        self._history_box.tag_config("info", foreground=TEXT_DIM)
+        self._history_box.tag_config("error", foreground=TEXT_RED)
+        self._history_box.tag_config("dim", foreground=TEXT_DIM)
 
         self._lbl_status = tk.Label(
-            status_bar, text="Running", font=("Segoe UI", 9),
-            bg=BG_CARD, fg=TEXT_GREEN
+            status_bar, text="Running", font=("Segoe UI", 9), bg=BG_CARD, fg=TEXT_GREEN
         )
         self._lbl_status.pack(side="left", padx=12)
 
         tk.Button(
-            status_bar, text="Quit",
+            status_bar,
+            text="Quit",
             font=("Segoe UI", 9),
-            bg=BG_CARD, fg=TEXT_DIM,
-            relief="flat", bd=0, cursor="hand2",
-            activebackground=BG_CARD, activeforeground=TEXT_RED,
+            bg=BG_CARD,
+            fg=TEXT_DIM,
+            relief="flat",
+            bd=0,
+            cursor="hand2",
+            activebackground=BG_CARD,
+            activeforeground=TEXT_RED,
             command=self._do_quit,
         ).pack(side="right", padx=12)
 
         tk.Button(
-            status_bar, text="Settings",
+            status_bar,
+            text="Settings",
             font=("Segoe UI", 9),
-            bg=BG_CARD, fg=TEXT_DIM,
-            relief="flat", bd=0, cursor="hand2",
-            activebackground=BG_CARD, activeforeground=ACCENT,
+            bg=BG_CARD,
+            fg=TEXT_DIM,
+            relief="flat",
+            bd=0,
+            cursor="hand2",
+            activebackground=BG_CARD,
+            activeforeground=ACCENT,
             command=self._open_settings,
+        ).pack(side="right", padx=4)
+
+        tk.Button(
+            status_bar,
+            text="Fingerprint Now",
+            font=("Segoe UI", 9),
+            bg=BG_CARD,
+            fg=TEXT_DIM,
+            relief="flat",
+            bd=0,
+            cursor="hand2",
+            activebackground=BG_CARD,
+            activeforeground=TEXT_GOLD,
+            command=self._trigger_fingerprint,
         ).pack(side="right", padx=4)
 
     # ── Update methods (run in tkinter thread via queue) ──────────────────
 
     def _set_track(self, track: dict, game: dict | None):
-        title  = track.get("title", "") or "Unknown title"
+        title = track.get("title", "") or "Unknown title"
         artist = track.get("artist", "") or ""
-        album  = track.get("album", "") or ""
+        album = track.get("album", "") or ""
         source = track.get("source", "")
 
         # Source label
@@ -262,6 +288,7 @@ class MainWindow:
 
     def _on_settings_saved(self):
         import config
+
         if config.is_configured():
             self._append_log("Credentials saved — tracker is running.", "info")
             self._lbl_status.config(text="Running", fg=TEXT_GREEN)
@@ -271,6 +298,10 @@ class MainWindow:
     def _open_settings(self):
         if self.on_show_settings:
             self.on_show_settings()
+
+    def _trigger_fingerprint(self):
+        if self.on_fingerprint_now:
+            self.on_fingerprint_now()
 
     def _do_quit(self):
         self._root.destroy()

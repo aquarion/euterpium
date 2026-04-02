@@ -23,8 +23,6 @@ logging.getLogger("smtc").setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
-
-
 def main():
     # Report winsdk status now that logging is definitely active
     if smtc.WINSDK_AVAILABLE:
@@ -44,7 +42,13 @@ def main():
         # Settings window must open in the tkinter thread
         window._queue.put(("open_settings",))
 
-    window = MainWindow(on_quit=on_quit, on_show_settings=on_show_settings)
+    def on_fingerprint_now():
+        # Trigger manual fingerprinting
+        tracker.force_fingerprint()
+
+    window = MainWindow(
+        on_quit=on_quit, on_show_settings=on_show_settings, on_fingerprint_now=on_fingerprint_now
+    )
     tray = TrayIcon(
         on_show_window=lambda: window.show(),
         on_show_settings=on_show_settings,
