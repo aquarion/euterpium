@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import queue
 import re
+import shutil
 import subprocess
 import tempfile
 import threading
@@ -121,9 +122,9 @@ def fetch_latest_update(current_version: str) -> AvailableUpdate | None:
     }
 
     try:
-        response = requests.get(LATEST_RELEASE_URL, headers=headers, timeout=REQUEST_TIMEOUT)
-        response.raise_for_status()
-        payload = response.json()
+        with requests.get(LATEST_RELEASE_URL, headers=headers, timeout=REQUEST_TIMEOUT) as response:
+            response.raise_for_status()
+            payload = response.json()
     except requests.RequestException as exc:
         raise UpdateError(f"Unable to reach GitHub Releases: {exc}") from exc
     except ValueError as exc:
@@ -132,12 +133,12 @@ def fetch_latest_update(current_version: str) -> AvailableUpdate | None:
     return parse_latest_release(payload, current_version)
 
 
-def download_installer(update: AvailableUpdate, destination_dir: str | Path | None = None) -> Path:
+def download_installer(update: AvailableUpdate, destination_dir: str | Path) -> Path:
     """Download the installer for the given update and return the local file path."""
     # Validate the URL even if the caller didn't go through parse_latest_release().
     _validate_installer_url(update.installer_url)
 
-    target_dir = Path(destination_dir or tempfile.mkdtemp(prefix="euterpium-update-"))
+    target_dir = Path(destination_dir)
     target_dir.mkdir(parents=True, exist_ok=True)
 
     # Sanitize to a plain filename to prevent path traversal from remote metadata.
@@ -250,12 +251,18 @@ class UpdateManager:
         threading.Thread(target=self._install_worker, args=(update,), daemon=True).start()
 
     def _install_worker(self, update: AvailableUpdate) -> None:
+        tmp_dir = Path(tempfile.mkdtemp(prefix="euterpium-update-"))
         try:
             self._emit("status", f"Downloading Euterpium {update.version} installer...")
-            installer_path = download_installer(update)
+            installer_path = download_installer(update, tmp_dir)
             launch_installer(installer_path)
             self._emit("update_installer_launched", update, str(installer_path))
+            # Schedule temp dir cleanup after a delay to give the installer time to unpack.
+            threading.Timer(
+                60.0, shutil.rmtree, args=[tmp_dir], kwargs={"ignore_errors": True}
+            ).start()
         except UpdateError as exc:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
             logger.warning("Update install failed: %s", exc)
             self._emit("error", f"Update install failed: {exc}")
         finally:

@@ -77,6 +77,12 @@ def test_fetch_latest_update_uses_github_response(monkeypatch):
                 ],
             }
 
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
     monkeypatch.setattr(updater.requests, "get", lambda *args, **kwargs: Response())
 
     update = updater.fetch_latest_update("0.2.0")
