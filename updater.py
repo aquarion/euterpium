@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import logging
+import os
 import queue
 import re
 import shutil
-import subprocess
 import tempfile
 import threading
 from dataclasses import dataclass
@@ -44,7 +44,7 @@ def normalize_version(version: str) -> tuple[int, int, int]:
     while len(numbers) < 3:
         numbers.append(0)
 
-    return tuple(numbers)
+    return (numbers[0], numbers[1], numbers[2])
 
 
 def is_newer_version(current_version: str, candidate_version: str) -> bool:
@@ -174,7 +174,7 @@ def launch_installer(installer_path: str | Path) -> None:
     """Launch the downloaded installer without blocking the main application."""
     path = Path(installer_path)
     try:
-        subprocess.Popen([str(path)], close_fds=True)
+        os.startfile(str(path))  # Windows-only; idiomatic way to run an installer
     except OSError as exc:
         raise UpdateError(f"Failed to launch installer: {exc}") from exc
 
@@ -258,9 +258,11 @@ class UpdateManager:
             launch_installer(installer_path)
             self._emit("update_installer_launched", update, str(installer_path))
             # Schedule temp dir cleanup after a delay to give the installer time to unpack.
-            threading.Timer(
+            cleanup_timer = threading.Timer(
                 60.0, shutil.rmtree, args=[tmp_dir], kwargs={"ignore_errors": True}
-            ).start()
+            )
+            cleanup_timer.daemon = True
+            cleanup_timer.start()
         except UpdateError as exc:
             shutil.rmtree(tmp_dir, ignore_errors=True)
             logger.warning("Update install failed: %s", exc)
