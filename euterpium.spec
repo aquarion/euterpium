@@ -15,6 +15,7 @@ a = Analysis(
         # Bundle the default config and icon as data files
         ('euterpium.ini', '.'),
         ('icons/app_icon.png', '.'),
+        ('icons/app_listening.png', '.'),
     ],
     hiddenimports=[
         # tkinter and its sub-modules are sometimes missed

@@ -2,13 +2,18 @@
 
 import logging
 import os
+from typing import TYPE_CHECKING
 
 from PIL import Image, ImageDraw
+
+if TYPE_CHECKING:
+    from updater import AvailableUpdate
 
 logger = logging.getLogger(__name__)
 
 try:
     import pystray
+
     PYSTRAY_AVAILABLE = True
 except ImportError:
     PYSTRAY_AVAILABLE = False
@@ -57,14 +62,26 @@ class TrayIcon:
         on_quit()         — called when user clicks Quit
     """
 
-    def __init__(self, on_show_window, on_show_settings, on_quit):
+    def __init__(
+        self,
+        on_show_window,
+        on_show_settings,
+        on_quit,
+        on_check_for_updates=None,
+        on_install_update=None,
+        current_version: str = "",
+    ):
         self.on_show_window = on_show_window
         self.on_show_settings = on_show_settings
         self.on_quit = on_quit
+        self.on_check_for_updates = on_check_for_updates
+        self.on_install_update = on_install_update
         self._icon: pystray.Icon | None = None
         self._current_track_label = "Nothing playing"
         self._icon_default: Image.Image | None = None
         self._icon_listening: Image.Image | None = None
+        self._current_version = current_version
+        self._available_update: AvailableUpdate | None = None
 
     def update_track(self, title: str, artist: str, game_name: str | None = None):
         """Updates the tray tooltip with the current track."""
@@ -88,15 +105,47 @@ class TrayIcon:
         if self._icon:
             self._icon.menu = self._build_menu()
 
+    def set_available_update(self, update: "AvailableUpdate | None"):
+        self._available_update = update
+        self._update_menu()
+
     def _build_menu(self) -> "pystray.Menu":
-        return pystray.Menu(
+        items = [
             pystray.MenuItem(self._current_track_label, None, enabled=False),
-            pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Show window",  lambda: self.on_show_window()),
-            pystray.MenuItem("Settings",     lambda: self.on_show_settings()),
-            pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Quit", lambda: self._quit()),
+        ]
+
+        if self._current_version:
+            items.extend(
+                [
+                    pystray.MenuItem(f"Version {self._current_version}", None, enabled=False),
+                ]
+            )
+
+        if self._available_update is not None:
+            items.extend(
+                [
+                    pystray.MenuItem(
+                        f"Install update {self._available_update.version}",
+                        lambda: self.on_install_update() if self.on_install_update else None,
+                    ),
+                ]
+            )
+
+        items.extend(
+            [
+                pystray.Menu.SEPARATOR,
+                pystray.MenuItem("Show window", lambda: self.on_show_window()),
+                pystray.MenuItem("Settings", lambda: self.on_show_settings()),
+                pystray.MenuItem(
+                    "Check for updates",
+                    lambda: self.on_check_for_updates() if self.on_check_for_updates else None,
+                ),
+                pystray.Menu.SEPARATOR,
+                pystray.MenuItem("Quit", lambda: self._quit()),
+            ]
         )
+
+        return pystray.Menu(*items)
 
     def _quit(self):
         if self._icon:
@@ -118,6 +167,7 @@ class TrayIcon:
             logger.warning("pystray unavailable — running without tray icon")
             # Keep main thread alive without tray
             import time
+
             while True:
                 time.sleep(1)
             return
