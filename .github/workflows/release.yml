@@ -45,10 +45,15 @@ jobs:
       - name: Install dependencies
         run: poetry install --with dev
 
+      - name: Run tests
+        run: poetry run pytest --tb=short -q
+
       - name: Set release version
         shell: pwsh
+        env:
+          DEPLOY_VERSION: ${{ inputs.deploy_version }}
         run: |
-          $tag = if ("${{ inputs.deploy_version }}" -ne "") { "${{ inputs.deploy_version }}" } else { "${{ github.ref_name }}" }
+          $tag = if ($env:DEPLOY_VERSION -ne "") { $env:DEPLOY_VERSION } else { "${{ github.ref_name }}" }
           $version = $tag.TrimStart('v')
           $content = Get-Content version.py -Raw
           $content = $content -replace '__version__ = ".*"', "__version__ = `"$version`""
@@ -60,7 +65,7 @@ jobs:
         run: poetry run pyinstaller euterpium.spec
 
       - name: Install Inno Setup
-        run: choco install innosetup --no-progress -y
+        run: choco install innosetup --version=6.3.3 --no-progress -y
 
       - name: Build installer
         shell: pwsh
@@ -71,7 +76,7 @@ jobs:
         run: |
           $tag = $env:RELEASE_TAG
           $zip = "euterpium-${tag}-windows.zip"
-          $installer = "dist\installer\euterpium-${tag}-setup.exe"
+          $installer = "dist/installer/euterpium-${tag}-setup.exe"
           $checksum = "${installer}.sha256"
           Compress-Archive -Path dist\euterpium\* -DestinationPath $zip
           $hash = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLower()
