@@ -1,5 +1,7 @@
 # ui/tray.py — system tray icon using pystray
 
+from __future__ import annotations
+
 import logging
 import os
 from typing import TYPE_CHECKING
@@ -20,7 +22,7 @@ except ImportError:
     logger.warning("pystray not available — tray icon disabled. Install with: pip install pystray")
 
 
-def _load_named_icon(filename: str) -> "Image.Image | None":
+def _load_named_icon(filename: str) -> Image.Image | None:
     path = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "icons", filename))
     if os.path.exists(path):
         img = Image.open(path).convert("RGBA")
@@ -28,7 +30,7 @@ def _load_named_icon(filename: str) -> "Image.Image | None":
     return None
 
 
-def _load_icon_image() -> "Image.Image":
+def _load_icon_image() -> Image.Image:
     """
     Loads the app icon.
     Falls back to a generated icon if the file isn't found.
@@ -105,11 +107,11 @@ class TrayIcon:
         if self._icon:
             self._icon.menu = self._build_menu()
 
-    def set_available_update(self, update: "AvailableUpdate | None"):
+    def set_available_update(self, update: AvailableUpdate | None):
         self._available_update = update
         self._update_menu()
 
-    def _build_menu(self) -> "pystray.Menu":
+    def _build_menu(self) -> pystray.Menu:
         items = [
             pystray.MenuItem(self._current_track_label, None, enabled=False),
         ]
@@ -121,14 +123,20 @@ class TrayIcon:
                 ]
             )
 
-        if self._available_update is not None:
+        if self._available_update is not None and self.on_install_update:
             items.extend(
                 [
                     pystray.MenuItem(
                         f"Install update {self._available_update.version}",
-                        lambda: self.on_install_update() if self.on_install_update else None,
+                        lambda: self.on_install_update(),
                     ),
                 ]
+            )
+
+        update_items = []
+        if self.on_check_for_updates:
+            update_items.append(
+                pystray.MenuItem("Check for updates", lambda: self.on_check_for_updates())
             )
 
         items.extend(
@@ -136,10 +144,7 @@ class TrayIcon:
                 pystray.Menu.SEPARATOR,
                 pystray.MenuItem("Show window", lambda: self.on_show_window()),
                 pystray.MenuItem("Settings", lambda: self.on_show_settings()),
-                pystray.MenuItem(
-                    "Check for updates",
-                    lambda: self.on_check_for_updates() if self.on_check_for_updates else None,
-                ),
+                *update_items,
                 pystray.Menu.SEPARATOR,
                 pystray.MenuItem("Quit", lambda: self._quit()),
             ]

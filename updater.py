@@ -84,12 +84,33 @@ def parse_latest_release(release: dict, current_version: str) -> AvailableUpdate
     if not download_url or not name:
         raise UpdateError("Latest release installer asset is missing download metadata")
 
+    _validate_installer_url(download_url)
+
     return AvailableUpdate(
         version=tag_name.lstrip("v"),
         release_url=release.get("html_url", ""),
         installer_name=name,
         installer_url=download_url,
     )
+
+
+_ALLOWED_INSTALLER_HOSTS = frozenset(
+    {
+        "github.com",
+        "objects.githubusercontent.com",
+    }
+)
+
+
+def _validate_installer_url(url: str) -> None:
+    """Raise UpdateError if the installer URL is not a safe HTTPS GitHub URL."""
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    if parsed.scheme != "https":
+        raise UpdateError(f"Installer URL must use HTTPS, got: {parsed.scheme!r}")
+    if parsed.hostname not in _ALLOWED_INSTALLER_HOSTS:
+        raise UpdateError(f"Installer URL host {parsed.hostname!r} is not in the allowed list")
 
 
 def fetch_latest_update(current_version: str) -> AvailableUpdate | None:
@@ -115,7 +136,20 @@ def download_installer(update: AvailableUpdate, destination_dir: str | Path | No
     """Download the installer for the given update and return the local file path."""
     target_dir = Path(destination_dir or tempfile.mkdtemp(prefix="euterpium-update-"))
     target_dir.mkdir(parents=True, exist_ok=True)
-    target_path = target_dir / update.installer_name
+
+    # Sanitize to a plain filename to prevent path traversal from remote metadata.
+    # Also explicitly reject backslashes — on non-Windows, Path().name does not
+    # treat '\' as a separator, so "..\\evil.exe" would pass the .name check.
+    installer_name = Path(update.installer_name).name
+    if (
+        not installer_name
+        or installer_name != update.installer_name
+        or "\\" in update.installer_name
+    ):
+        raise UpdateError(
+            f"Invalid installer name received from update metadata: {update.installer_name!r}"
+        )
+    target_path = target_dir / installer_name
 
     try:
         response = requests.get(update.installer_url, stream=True, timeout=REQUEST_TIMEOUT)

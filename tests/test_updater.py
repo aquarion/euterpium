@@ -72,7 +72,7 @@ def test_fetch_latest_update_uses_github_response(monkeypatch):
                 "assets": [
                     {
                         "name": "euterpium-v0.3.0-setup.exe",
-                        "browser_download_url": "https://example.com/setup.exe",
+                        "browser_download_url": "https://objects.githubusercontent.com/aquarion/euterpium/releases/download/v0.3.0/euterpium-v0.3.0-setup.exe",
                     }
                 ],
             }
@@ -106,6 +106,36 @@ def test_download_installer_writes_file(monkeypatch, tmp_path):
 
     assert path == Path(tmp_path) / "euterpium-v0.3.0-setup.exe"
     assert path.read_bytes() == b"helloworld"
+
+
+def test_validate_installer_url_accepts_github_host():
+    updater._validate_installer_url(
+        "https://objects.githubusercontent.com/github-production-release-asset/v0.2.0/setup.exe"
+    )
+
+
+def test_validate_installer_url_rejects_http():
+    with pytest.raises(updater.UpdateError, match="HTTPS"):
+        updater._validate_installer_url(
+            "http://github.com/aquarion/euterpium/releases/download/v0.2.0/setup.exe"
+        )
+
+
+def test_validate_installer_url_rejects_unknown_host():
+    with pytest.raises(updater.UpdateError, match="allowed list"):
+        updater._validate_installer_url("https://evil.example.com/setup.exe")
+
+
+def test_download_installer_rejects_path_traversal(monkeypatch, tmp_path):
+    update = updater.AvailableUpdate(
+        version="0.3.0",
+        release_url="https://example.com/release",
+        installer_name="..\\..\\evil.exe",
+        installer_url="https://github.com/aquarion/euterpium/releases/download/v0.3.0/evil.exe",
+    )
+
+    with pytest.raises(updater.UpdateError, match="Invalid installer name"):
+        updater.download_installer(update, tmp_path)
 
 
 def test_update_manager_reports_available_update(monkeypatch):
