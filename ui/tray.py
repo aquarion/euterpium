@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from typing import TYPE_CHECKING
 
 from PIL import Image, ImageDraw
@@ -84,6 +85,7 @@ class TrayIcon:
         self._icon_listening: Image.Image | None = None
         self._current_version = current_version
         self._available_update: AvailableUpdate | None = None
+        self._stop_requested = threading.Event()
 
     def update_track(self, title: str, artist: str, game_name: str | None = None):
         """Updates the tray tooltip with the current track."""
@@ -153,9 +155,13 @@ class TrayIcon:
         return pystray.Menu(*items)
 
     def _quit(self):
+        self.stop()
+        self.on_quit()
+
+    def stop(self):
+        self._stop_requested.set()
         if self._icon:
             self._icon.stop()
-        self.on_quit()
 
     def set_listening(self, listening: bool):
         """Swaps the tray icon to indicate active audio fingerprinting."""
@@ -173,7 +179,7 @@ class TrayIcon:
             # Keep main thread alive without tray
             import time
 
-            while True:
+            while not self._stop_requested.is_set():
                 time.sleep(1)
             return
 

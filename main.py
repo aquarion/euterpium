@@ -1,7 +1,6 @@
 # main.py — entry point: wires tracker, tray, and window together
 
 import logging
-import os
 import queue
 import threading
 
@@ -11,7 +10,7 @@ from tracker import Tracker
 from ui.notifications import notify_track, notify_update_available
 from ui.tray import TrayIcon
 from ui.window import MainWindow
-from updater import UpdateManager
+from updater import UpdateManager, cleanup_stale_update_dirs
 from version import __version__
 
 # Configure logging before any local imports so module-level log messages
@@ -40,7 +39,7 @@ def main():
 
     def on_quit():
         tracker.stop()
-        os._exit(0)
+        tray.stop()
 
     def on_show_settings():
         # Settings window must open in the tkinter thread
@@ -69,6 +68,10 @@ def main():
     )
     tracker = Tracker(event_queue=event_queue)
     update_manager = UpdateManager(event_queue=event_queue, current_version=__version__)
+
+    removed_temp_dirs = cleanup_stale_update_dirs()
+    if removed_temp_dirs:
+        logger.info("Removed %s stale updater temp directories", removed_temp_dirs)
 
     # ── Event pump: moves tracker events → window + tray ─────────────────
 

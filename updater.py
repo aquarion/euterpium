@@ -23,10 +23,38 @@ GITHUB_OWNER = "aquarion"
 GITHUB_REPO = "euterpium"
 LATEST_RELEASE_URL = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
 REQUEST_TIMEOUT = (5, 30)
+UPDATE_TEMP_DIR_PREFIX = "euterpium-update-"
 
 
 class UpdateError(RuntimeError):
     """Raised when update checking or download fails."""
+
+
+def cleanup_stale_update_dirs(max_age_seconds: int = 24 * 60 * 60) -> int:
+    """Delete stale updater temp directories from previous runs.
+
+    Returns the number of directories successfully removed.
+    """
+    now = time.time()
+    temp_root = Path(tempfile.gettempdir())
+    removed_count = 0
+
+    for path in temp_root.glob(f"{UPDATE_TEMP_DIR_PREFIX}*"):
+        if not path.is_dir():
+            continue
+        try:
+            age_seconds = now - path.stat().st_mtime
+        except OSError:
+            continue
+        if age_seconds < max_age_seconds:
+            continue
+        try:
+            shutil.rmtree(path, ignore_errors=False)
+            removed_count += 1
+        except OSError:
+            continue
+
+    return removed_count
 
 
 @dataclass(frozen=True)
@@ -301,15 +329,11 @@ class UpdateManager:
         threading.Thread(target=self._install_worker, args=(update,), daemon=True).start()
 
     def _install_worker(self, update: AvailableUpdate) -> None:
-        tmp_dir = Path(tempfile.mkdtemp(prefix="euterpium-update-"))
+        tmp_dir = Path(tempfile.mkdtemp(prefix=UPDATE_TEMP_DIR_PREFIX))
         try:
             self._emit("status", f"Downloading Euterpium {update.version} installer...")
             installer_path = download_installer(update, tmp_dir)
             launch_installer(installer_path)
-            # Give the installer process a short head-start, then clean up temp files
-            # synchronously before listeners potentially hard-exit the app.
-            time.sleep(2)
-            shutil.rmtree(tmp_dir, ignore_errors=True)
             self._emit("update_installer_launched", update, str(installer_path))
         except UpdateError as exc:
             shutil.rmtree(tmp_dir, ignore_errors=True)
