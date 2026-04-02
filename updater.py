@@ -12,6 +12,7 @@ import tempfile
 import threading
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 
@@ -125,8 +126,6 @@ _ALLOWED_INSTALLER_HOSTS = frozenset(
 
 def _validate_installer_url(url: str) -> None:
     """Raise UpdateError if the installer URL is not a safe HTTPS GitHub URL."""
-    from urllib.parse import urlparse
-
     parsed = urlparse(url)
     if parsed.scheme != "https":
         raise UpdateError(f"Installer URL must use HTTPS, got: {parsed.scheme!r}")
@@ -191,13 +190,25 @@ def download_installer(update: AvailableUpdate, destination_dir: str | Path) -> 
         try:
             with requests.get(update.checksum_url, timeout=REQUEST_TIMEOUT) as checksum_response:
                 checksum_response.raise_for_status()
-                # Accept both bare hex digest and "<hash>  <filename>" shasum format.
-                expected_sha256 = checksum_response.text.split()[0].lower()
+                checksum_text = checksum_response.text
         except requests.RequestException as exc:
             target_path.unlink(missing_ok=True)
             raise UpdateError(f"Failed to fetch installer checksum: {exc}") from exc
 
-        actual_sha256 = hashlib.sha256(target_path.read_bytes()).hexdigest()
+        # Accept both bare hex digest and "<hash>  <filename>" shasum format.
+        parts = checksum_text.split()
+        if not parts:
+            target_path.unlink(missing_ok=True)
+            raise UpdateError("Installer checksum file is empty or invalid")
+        expected_sha256 = parts[0].lower()
+
+        # Hash in chunks to avoid loading the full installer into memory.
+        sha256 = hashlib.sha256()
+        with target_path.open("rb") as fh:
+            for chunk in iter(lambda: fh.read(65536), b""):
+                sha256.update(chunk)
+        actual_sha256 = sha256.hexdigest()
+
         if actual_sha256 != expected_sha256:
             target_path.unlink(missing_ok=True)
             raise UpdateError(
