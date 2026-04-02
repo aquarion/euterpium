@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import queue
@@ -32,6 +33,7 @@ class AvailableUpdate:
     release_url: str
     installer_name: str
     installer_url: str
+    checksum_url: str | None = None
 
 
 def normalize_version(version: str) -> tuple[int, int, int]:
@@ -67,6 +69,12 @@ def find_installer_asset(assets: list[dict]) -> dict | None:
     return (preferred or executables)[0]
 
 
+def find_checksum_asset(assets: list[dict], installer_name: str) -> dict | None:
+    """Return the SHA256 sidecar asset for the given installer filename, if present."""
+    expected = (installer_name + ".sha256").lower()
+    return next((a for a in assets if a.get("name", "").lower() == expected), None)
+
+
 def parse_latest_release(release: dict, current_version: str) -> AvailableUpdate | None:
     """Convert GitHub release JSON into an installable update, if newer."""
     if release.get("draft"):
@@ -87,11 +95,23 @@ def parse_latest_release(release: dict, current_version: str) -> AvailableUpdate
 
     _validate_installer_url(download_url)
 
+    checksum_url: str | None = None
+    checksum_asset = find_checksum_asset(release.get("assets", []), name)
+    if checksum_asset:
+        raw_checksum_url = checksum_asset.get("browser_download_url")
+        if raw_checksum_url:
+            try:
+                _validate_installer_url(raw_checksum_url)
+                checksum_url = raw_checksum_url
+            except UpdateError:
+                logger.warning("Checksum asset URL failed validation; skipping verification")
+
     return AvailableUpdate(
         version=tag_name.lstrip("v"),
         release_url=release.get("html_url", ""),
         installer_name=name,
         installer_url=download_url,
+        checksum_url=checksum_url,
     )
 
 
@@ -166,6 +186,24 @@ def download_installer(update: AvailableUpdate, destination_dir: str | Path) -> 
         raise UpdateError(f"Failed to download installer: {exc}") from exc
     except OSError as exc:
         raise UpdateError(f"Failed to save installer: {exc}") from exc
+
+    if update.checksum_url:
+        try:
+            with requests.get(update.checksum_url, timeout=REQUEST_TIMEOUT) as checksum_response:
+                checksum_response.raise_for_status()
+                # Accept both bare hex digest and "<hash>  <filename>" shasum format.
+                expected_sha256 = checksum_response.text.split()[0].lower()
+        except requests.RequestException as exc:
+            target_path.unlink(missing_ok=True)
+            raise UpdateError(f"Failed to fetch installer checksum: {exc}") from exc
+
+        actual_sha256 = hashlib.sha256(target_path.read_bytes()).hexdigest()
+        if actual_sha256 != expected_sha256:
+            target_path.unlink(missing_ok=True)
+            raise UpdateError(
+                f"Installer checksum mismatch — the download may be corrupt or tampered with. "
+                f"Expected {expected_sha256!r}, got {actual_sha256!r}"
+            )
 
     return target_path
 

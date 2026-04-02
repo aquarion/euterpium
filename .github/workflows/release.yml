@@ -71,9 +71,14 @@ jobs:
         run: |
           $tag = $env:RELEASE_TAG
           $zip = "euterpium-${tag}-windows.zip"
+          $installer = "dist\installer\euterpium-${tag}-setup.exe"
+          $checksum = "${installer}.sha256"
           Compress-Archive -Path dist\euterpium\* -DestinationPath $zip
+          $hash = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLower()
+          Set-Content -Path $checksum -Value $hash -NoNewline
           echo "ZIP_NAME=$zip" >> $env:GITHUB_ENV
-          echo "INSTALLER_NAME=dist\installer\euterpium-${tag}-setup.exe" >> $env:GITHUB_ENV
+          echo "INSTALLER_NAME=$installer" >> $env:GITHUB_ENV
+          echo "CHECKSUM_NAME=$checksum" >> $env:GITHUB_ENV
         shell: pwsh
 
       - name: Create release
@@ -85,5 +90,6 @@ jobs:
           files: |
             ${{ env.ZIP_NAME }}
             ${{ env.INSTALLER_NAME }}
+            ${{ env.CHECKSUM_NAME }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
