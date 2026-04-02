@@ -26,6 +26,12 @@ On first launch, the settings window opens automatically. Enter your ACRCloud cr
 
 Config is stored at `%LOCALAPPDATA%\euterpium\euterpium.ini`.
 
+## Installer and updates
+
+- Release builds now target a Windows installer built from PyInstaller output.
+- GitHub Releases should publish both a portable zip and an installer `.exe`.
+- The app can check GitHub Releases for a newer installer and offer it from the tray menu.
+
 ## Architecture
 
 | File | Purpose |

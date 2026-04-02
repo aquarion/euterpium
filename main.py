@@ -1,16 +1,17 @@
 # main.py — entry point: wires tracker, tray, and window together
 
 import logging
-import os
 import queue
 import threading
 
 import config
 import smtc
 from tracker import Tracker
-from ui.notifications import notify_track
+from ui.notifications import notify_track, notify_update_available
 from ui.tray import TrayIcon
 from ui.window import MainWindow
+from updater import UpdateManager, cleanup_stale_update_dirs
+from version import __version__
 
 # Configure logging before any local imports so module-level log messages
 # (e.g. winsdk availability) are captured from the start
@@ -24,6 +25,8 @@ logger = logging.getLogger(__name__)
 
 
 def main():
+    logger.info("Starting Euterpium %s", __version__)
+
     # Report winsdk status now that logging is definitely active
     if smtc.WINSDK_AVAILABLE:
         logger.info("SMTC: winsdk loaded — media session detection enabled")
@@ -36,7 +39,7 @@ def main():
 
     def on_quit():
         tracker.stop()
-        os._exit(0)
+        tray.stop()
 
     def on_show_settings():
         # Settings window must open in the tkinter thread
@@ -46,6 +49,12 @@ def main():
         # Trigger manual fingerprinting
         tracker.force_fingerprint()
 
+    def on_check_for_updates():
+        update_manager.check_for_updates(manual=True)
+
+    def on_install_update():
+        update_manager.install_available_update()
+
     window = MainWindow(
         on_quit=on_quit, on_show_settings=on_show_settings, on_fingerprint_now=on_fingerprint_now
     )
@@ -53,8 +62,16 @@ def main():
         on_show_window=lambda: window.show(),
         on_show_settings=on_show_settings,
         on_quit=on_quit,
+        on_check_for_updates=on_check_for_updates,
+        on_install_update=on_install_update,
+        current_version=__version__,
     )
     tracker = Tracker(event_queue=event_queue)
+    update_manager = UpdateManager(event_queue=event_queue, current_version=__version__)
+
+    removed_temp_dirs = cleanup_stale_update_dirs()
+    if removed_temp_dirs:
+        logger.info("Removed %s stale updater temp directories", removed_temp_dirs)
 
     # ── Event pump: moves tracker events → window + tray ─────────────────
 
@@ -89,6 +106,26 @@ def main():
                 window.log_status(message, level="error")
                 logger.error(message)
 
+            elif kind == "update_checked":
+                _, update = msg
+                # Always sync tray state — clears stale "Install update" when update is None.
+                tray.set_available_update(update)
+
+            elif kind == "update_available":
+                _, update = msg
+                window.log_status(f"Update available: Euterpium {update.version}", level="info")
+                logger.info("Update available: Euterpium %s", update.version)
+                notify_update_available(update.version)
+
+            elif kind == "update_installer_launched":
+                _, update, installer_path = msg
+                window.log_status(
+                    f"Installer launched for Euterpium {update.version}; closing app...",
+                    level="info",
+                )
+                logger.info("Installer launched from %s", installer_path)
+                on_quit()
+
     # ── Start threads ─────────────────────────────────────────────────────
 
     # Event pump thread
@@ -117,6 +154,7 @@ def main():
 
     # Tray runs in main thread (required by pystray on Windows) — blocks here
     logger.info("Euterpium running — check your system tray")
+    update_manager.check_for_updates(manual=False)
     tray.run()
 
 

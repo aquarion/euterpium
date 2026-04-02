@@ -45,16 +45,58 @@ jobs:
       - name: Install dependencies
         run: poetry install --with dev
 
+      - name: Run tests
+        run: poetry run pytest --tb=short -q
+
+      - name: Set release version from tag
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag.TrimStart('v')
+          $content = Get-Content version.py -Raw
+          $content = $content -replace '__version__ = ".*"', "__version__ = `"$version`""
+          Set-Content version.py $content
+          echo "APP_VERSION=$version" >> $env:GITHUB_ENV
+          echo "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
+
+      - name: Set release version from input
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
+        shell: pwsh
+        env:
+          DEPLOY_VERSION: ${{ inputs.deploy_version }}
+        run: |
+          $tag = $env:DEPLOY_VERSION
+          $version = $tag.TrimStart('v')
+          $content = Get-Content version.py -Raw
+          $content = $content -replace '__version__ = ".*"', "__version__ = `"$version`""
+          Set-Content version.py $content
+          echo "APP_VERSION=$version" >> $env:GITHUB_ENV
+          echo "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
+
       - name: Build with PyInstaller
         run: poetry run pyinstaller euterpium.spec
 
+      - name: Install Inno Setup
+        run: choco install innosetup --version=6.3.3 --no-progress -y
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DAppVersion=$env:APP_VERSION" "/DReleaseTag=$env:RELEASE_TAG" euterpium.iss
+
       - name: Zip the build
         run: |
-          $tag = if ("${{ inputs.deploy_version }}" -ne "") { "${{ inputs.deploy_version }}" } else { "${{ github.ref_name }}" }
+          $tag = $env:RELEASE_TAG
           $zip = "euterpium-${tag}-windows.zip"
+          $installer = "dist/installer/euterpium-${tag}-setup.exe"
+          $checksum = "${installer}.sha256"
           Compress-Archive -Path dist\euterpium\* -DestinationPath $zip
+          $hash = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLower()
+          Set-Content -Path $checksum -Value $hash -NoNewline
           echo "ZIP_NAME=$zip" >> $env:GITHUB_ENV
-          echo "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
+          echo "INSTALLER_NAME=$installer" >> $env:GITHUB_ENV
+          echo "CHECKSUM_NAME=$checksum" >> $env:GITHUB_ENV
         shell: pwsh
 
       - name: Create release
@@ -63,6 +105,9 @@ jobs:
           tag_name: ${{ env.RELEASE_TAG }}
           name: "Euterpium ${{ env.RELEASE_TAG }}"
           generate_release_notes: true
-          files: ${{ env.ZIP_NAME }}
+          files: |
+            ${{ env.ZIP_NAME }}
+            ${{ env.INSTALLER_NAME }}
+            ${{ env.CHECKSUM_NAME }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

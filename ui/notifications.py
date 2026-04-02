@@ -7,10 +7,13 @@ logger = logging.getLogger(__name__)
 
 try:
     from win11toast import notify as _notify
+
     WIN11TOAST_AVAILABLE = True
 except ImportError:
     WIN11TOAST_AVAILABLE = False
-    logger.warning("win11toast not available — notifications disabled. Install with: pip install win11toast")
+    logger.warning(
+        "win11toast not available — notifications disabled. Install with: pip install win11toast"
+    )
 
 _ICON_PATH = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "icons", "app_icon.png")
@@ -25,7 +28,7 @@ def notify_track(track: dict, game: dict | None = None):
     if not WIN11TOAST_AVAILABLE:
         return
 
-    title  = track.get("title", "")
+    title = track.get("title", "")
     artist = track.get("artist", "")
     source = track.get("source", "")
 
@@ -34,12 +37,12 @@ def notify_track(track: dict, game: dict | None = None):
         if not game:
             return
         heading = game["display_name"]
-        body    = "Playing unrecognised track"
+        body = "Playing unrecognised track"
     elif not title:
         return
     else:
         heading = title
-        body    = artist
+        body = artist
         if game:
             body = f"{artist}  ·  {game['display_name']}" if artist else game["display_name"]
 
@@ -53,3 +56,22 @@ def notify_track(track: dict, game: dict | None = None):
     except Exception as e:
         # Notifications are best-effort — never crash the main loop
         logger.debug(f"Notification failed: {e}")
+
+
+def notify_update_available(version: str):
+    """Fires a Windows toast notification for an available app update."""
+    if not WIN11TOAST_AVAILABLE:
+        return
+
+    icon = _ICON_PATH if os.path.exists(_ICON_PATH) else None
+
+    try:
+        kwargs = {
+            "title": "Euterpium update available",
+            "body": f"Version {version} is ready to install from GitHub Releases.",
+        }
+        if icon:
+            kwargs["icon"] = icon
+        _notify(**kwargs)
+    except Exception as e:
+        logger.debug(f"Update notification failed: {e}")
