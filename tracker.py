@@ -24,6 +24,7 @@ class Tracker:
     Event types pushed to the queue:
         ("track", track_dict, game_dict | None)   — new track detected
         ("status", message_str)                   — status update
+        ("delivery", message_str, level_str)      — webhook delivery status
         ("error", message_str)                    — error message
     """
 
@@ -97,11 +98,32 @@ class Tracker:
                 self._emit("status", "No game running — checking SMTC instead")
                 track = get_smtc_track_sync(ignored_apps=config.get_smtc_ignored_apps())
                 if track:
-                    if self._try_set_last_track(track, game=None):
-                        post_now_playing(track)
+                    if track.get("excluded"):
+                        source_name = (
+                            track.get("source_app_name") or track.get("source_app") or "unknown"
+                        )
+                        artist = track.get("artist", "")
+                        title = track.get("title", "")
+                        if artist or title:
+                            self._emit(
+                                "status",
+                                f"Ignored source ({source_name}): {artist} — {title}".strip(" —"),
+                            )
+                        else:
+                            self._emit("status", f"Ignored source ({source_name})")
+                        self._emit(
+                            "delivery", f"Webhook skipped (excluded source: {source_name})", "warn"
+                        )
+                    elif self._try_set_last_track(track, game=None):
+                        posted = post_now_playing(track)
                         self._emit("track", track, None)
+                        if posted:
+                            self._emit("delivery", "Webhook sent", "success")
+                        else:
+                            self._emit("delivery", "Webhook not sent", "error")
                     else:
                         self._emit("status", "Same track detected — no change")
+                        self._emit("delivery", "Webhook skipped (duplicate track)", "warn")
                 else:
                     self._emit("status", "No media playing")
                 return
@@ -119,14 +141,19 @@ class Tracker:
 
             if track:
                 if self._try_set_last_track(track, game=game):
-                    post_now_playing(track, game=game)
+                    posted = post_now_playing(track, game=game)
                     self._emit("track", track, game)
+                    if posted:
+                        self._emit("delivery", "Webhook sent", "success")
+                    else:
+                        self._emit("delivery", "Webhook not sent", "error")
                     self._emit(
                         "status",
                         f"Identified: {track.get('artist', '?')} - {track.get('title', '?')}",
                     )
                 else:
                     self._emit("status", "Same track detected — no change")
+                    self._emit("delivery", "Webhook skipped (duplicate track)", "warn")
             else:
                 self._emit("status", f"No match found in {game['display_name']}")
 
@@ -216,8 +243,16 @@ class Tracker:
 
                                 if track:
                                     if self._try_set_last_track(track, game=game):
-                                        post_now_playing(track, game=game)
+                                        posted = post_now_playing(track, game=game)
                                         self._emit("track", track, game)
+                                        if posted:
+                                            self._emit("delivery", "Webhook sent", "success")
+                                        else:
+                                            self._emit("delivery", "Webhook not sent", "error")
+                                    else:
+                                        self._emit(
+                                            "delivery", "Webhook skipped (duplicate track)", "warn"
+                                        )
                                 else:
                                     self._emit(
                                         "status", f"No match found in {game['display_name']}"
@@ -239,9 +274,31 @@ class Tracker:
                             self._fingerprint_lock.release()
                 else:
                     track = get_smtc_track_sync(ignored_apps=config.get_smtc_ignored_apps())
-                    if track and self._try_set_last_track(track, game=None):
-                        post_now_playing(track)
+                    if track and track.get("excluded"):
+                        source_name = (
+                            track.get("source_app_name") or track.get("source_app") or "unknown"
+                        )
+                        artist = track.get("artist", "")
+                        title = track.get("title", "")
+                        if artist or title:
+                            self._emit(
+                                "status",
+                                f"Ignored source ({source_name}): {artist} — {title}".strip(" —"),
+                            )
+                        else:
+                            self._emit("status", f"Ignored source ({source_name})")
+                        self._emit(
+                            "delivery", f"Webhook skipped (excluded source: {source_name})", "warn"
+                        )
+                    elif track and self._try_set_last_track(track, game=None):
+                        posted = post_now_playing(track)
                         self._emit("track", track, None)
+                        if posted:
+                            self._emit("delivery", "Webhook sent", "success")
+                        else:
+                            self._emit("delivery", "Webhook not sent", "error")
+                    elif track:
+                        self._emit("delivery", "Webhook skipped (duplicate track)", "warn")
                     elif not track:
                         with self._last_track_lock:
                             if self.last_track is not None:
