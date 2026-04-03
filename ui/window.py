@@ -47,6 +47,9 @@ class MainWindow:
     def log_status(self, message: str, level: str = "info"):
         self._queue.put(("status", message, level))
 
+    def set_delivery_status(self, message: str, level: str = "info"):
+        self._queue.put(("delivery", message, level))
+
     def show(self):
         self._queue.put(("show",))
 
@@ -82,6 +85,9 @@ class MainWindow:
         elif kind == "status":
             _, text, level = msg
             self._append_log(text, level)
+        elif kind == "delivery":
+            _, text, level = msg
+            self._set_delivery_status(text, level)
         elif kind == "show":
             self._show()
         elif kind == "hide":
@@ -136,6 +142,11 @@ class MainWindow:
 
         self._lbl_source = tk.Label(card, text="", font=("Segoe UI", 9), bg=BG_CARD, fg=TEXT_DIM)
         self._lbl_source.pack(anchor="w", pady=(6, 0))
+
+        self._lbl_delivery = tk.Label(
+            card, text="Webhook: —", font=("Segoe UI", 9), bg=BG_CARD, fg=TEXT_DIM
+        )
+        self._lbl_delivery.pack(anchor="w", pady=(4, 0))
 
         # ── Status bar (packed before list so it's always visible) ──────────
         status_bar = tk.Frame(root, bg=BG_CARD, pady=6)
@@ -234,7 +245,11 @@ class MainWindow:
         if game:
             source_parts.append(f"🎮 {game['display_name']}")
         if source == "smtc":
-            source_parts.append("via Windows Media Session")
+            source_name = track.get("source_app_name") or track.get("source_app")
+            if source_name:
+                source_parts.append(f"via Windows Media Session ({source_name})")
+            else:
+                source_parts.append("via Windows Media Session")
         elif source == "acrcloud":
             source_parts.append("via ACRCloud")
         elif source == "game_only":
@@ -246,31 +261,39 @@ class MainWindow:
         self._lbl_album.config(text=album)
         self._lbl_source.config(text="  ·  ".join(source_parts))
 
-        # Add to history
-        ts = datetime.now().strftime("%H:%M")
         tag = "game" if game else "track"
-
-        self._history_box.config(state="normal")
-        if self._history_box.index("end-1c") != "1.0":
-            self._history_box.insert("end", "\n")
-        self._history_box.insert("end", f"{ts}  ", "dim")
         if title != "Unrecognised track":
             entry = f"{artist} — {title}" if artist else title
         else:
             entry = f"{game['display_name']} — unrecognised"
-        self._history_box.insert("end", entry, tag)
-        self._history_box.see("end")
-        self._history_box.config(state="disabled")
+        self._append_history_entry(entry, tag)
 
     def _append_log(self, message: str, level: str = "info"):
-        ts = datetime.now().strftime("%H:%M:%S")
+        self._append_history_entry(message, level)
+        self._lbl_status.config(text=message, fg=TEXT_RED if level == "error" else TEXT_DIM)
+
+    def _history_timestamp(self) -> str:
+        return datetime.now().strftime("%H:%M:%S")
+
+    def _append_history_entry(self, message: str, tag: str):
+        ts = self._history_timestamp()
         self._history_box.config(state="normal")
         if self._history_box.index("end-1c") != "1.0":
             self._history_box.insert("end", "\n")
-        self._history_box.insert("end", f"{ts}  {message}", level)
+        self._history_box.insert("end", f"{ts}  ", "dim")
+        self._history_box.insert("end", message, tag)
         self._history_box.see("end")
         self._history_box.config(state="disabled")
-        self._lbl_status.config(text=message, fg=TEXT_RED if level == "error" else TEXT_DIM)
+
+    def _set_delivery_status(self, message: str, level: str = "info"):
+        color = TEXT_DIM
+        if level == "success":
+            color = TEXT_GREEN
+        elif level == "warn":
+            color = TEXT_GOLD
+        elif level == "error":
+            color = TEXT_RED
+        self._lbl_delivery.config(text=f"Webhook: {message}", fg=color)
 
     def _show(self):
         self._root.deiconify()
