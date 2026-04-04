@@ -53,9 +53,6 @@ jobs:
       - name: Install dependencies
         run: poetry install --with dev
 
-      - name: Run tests
-        run: poetry run pytest --tb=short -q
-
       - name: Set release version from tag
         if: github.event_name == 'push'
         shell: pwsh
@@ -67,6 +64,10 @@ jobs:
           Set-Content version.py $content
           echo "APP_VERSION=$version" >> $env:GITHUB_ENV
           echo "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
+
+      - name: Test after version replacement
+        run: poetry run pytest --tb=short -q
+        shell: pwsh
 
       - name: Set release version from input
         if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
@@ -84,6 +85,10 @@ jobs:
           Set-Content version.py $content
           echo "APP_VERSION=$version" >> $env:GITHUB_ENV
           echo "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
+
+      - name: Test after version replacement
+        run: poetry run pytest --tb=short -q
+        shell: pwsh
 
       - name: Build with PyInstaller
         run: poetry run pyinstaller euterpium.spec
