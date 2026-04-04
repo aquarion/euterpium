@@ -37,6 +37,7 @@ class Tracker:
         self._last_track_lock = threading.Lock()
         self._fingerprint_lock = threading.Lock()
         self._manual_fingerprint_running = False
+        self._last_duplicate_track_key: tuple | None = None
 
     # ── Public controls ────────────────────────────────────────────────────
 
@@ -110,7 +111,7 @@ class Tracker:
                             self._emit("delivery", "Webhook not sent", "error")
                     else:
                         self._emit("status", "Same track detected — no change")
-                        self._emit("delivery", "Webhook skipped (duplicate track)", "warn")
+                        self._emit_duplicate_track_once(track, game=None)
                 else:
                     self._emit("status", "No media playing")
                 return
@@ -140,7 +141,7 @@ class Tracker:
                     )
                 else:
                     self._emit("status", "Same track detected — no change")
-                    self._emit("delivery", "Webhook skipped (duplicate track)", "warn")
+                    self._emit_duplicate_track_once(track, game=game)
             else:
                 self._emit("status", f"No match found in {game['display_name']}")
 
@@ -156,6 +157,26 @@ class Tracker:
 
     def _emit(self, event_type: str, *args):
         self.event_queue.put((event_type, *args))
+
+    def _track_key(self, track: dict, game: dict | None = None) -> tuple:
+        game_key = None
+        if game is not None:
+            game_key = game.get("display_name") or game.get("name")
+
+        return (
+            (track.get("source") or "").lower(),
+            (track.get("title") or "").lower(),
+            (track.get("source_app") or "").lower(),
+            (game_key or "").lower(),
+        )
+
+    def _emit_duplicate_track_once(self, track: dict, game: dict | None = None):
+        duplicate_key = self._track_key(track, game=game)
+        if duplicate_key == self._last_duplicate_track_key:
+            return
+
+        self._last_duplicate_track_key = duplicate_key
+        self._emit("delivery", "Webhook skipped (duplicate track)", "warn")
 
     def _emit_excluded_smtc(self, track: dict):
         source_name = track.get("source_app_name") or track.get("source_app") or "unknown"
@@ -186,6 +207,7 @@ class Tracker:
             if self._tracks_are_same(track_state, self.last_track):
                 return False
             self.last_track = track_state
+            self._last_duplicate_track_key = None
             return True
 
     def _tracks_are_same(self, a: dict | None, b: dict | None) -> bool:
@@ -262,9 +284,7 @@ class Tracker:
                                         else:
                                             self._emit("delivery", "Webhook not sent", "error")
                                     else:
-                                        self._emit(
-                                            "delivery", "Webhook skipped (duplicate track)", "warn"
-                                        )
+                                        self._emit_duplicate_track_once(track, game=game)
                                 else:
                                     self._emit(
                                         "status", f"No match found in {game['display_name']}"
@@ -297,11 +317,12 @@ class Tracker:
                         else:
                             self._emit("delivery", "Webhook not sent", "error")
                     elif track:
-                        self._emit("delivery", "Webhook skipped (duplicate track)", "warn")
+                        self._emit_duplicate_track_once(track, game=None)
                     elif not track:
                         with self._last_track_lock:
                             if self.last_track is not None:
                                 self.last_track = None
+                                self._last_duplicate_track_key = None
                                 self._emit("status", "Playback stopped")
 
             except Exception as e:

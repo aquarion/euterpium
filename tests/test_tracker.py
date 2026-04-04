@@ -275,3 +275,17 @@ def test_manual_fingerprint_thread_safety(tracker):
 def test_is_running_returns_bool_when_stopped(tracker):
     assert tracker.is_running is False
     assert isinstance(tracker.is_running, bool)
+
+
+def test_emit_duplicate_track_once_per_same_track(tracker):
+    track = {"source": "smtc", "title": "Song", "source_app": "spotify.exe"}
+
+    tracker._emit_duplicate_track_once(track, game=None)
+    tracker._emit_duplicate_track_once(track, game=None)
+
+    events = []
+    while not tracker.event_queue.empty():
+        events.append(tracker.event_queue.get())
+
+    duplicate_events = [e for e in events if e[0] == "delivery" and "duplicate track" in e[1]]
+    assert len(duplicate_events) == 1
