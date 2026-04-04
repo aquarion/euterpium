@@ -116,9 +116,29 @@ jobs:
           tag_name: ${{ env.RELEASE_TAG }}
           name: "Euterpium ${{ env.RELEASE_TAG }}"
           generate_release_notes: true
+          draft: true
           files: |
             ${{ env.ZIP_NAME }}
             ${{ env.INSTALLER_NAME }}
             ${{ env.CHECKSUM_NAME }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean up artifacts
+        run: |
+          Remove-Item ${{ env.ZIP_NAME }}
+          Remove-Item ${{ env.INSTALLER_NAME }}
+          Remove-Item ${{ env.CHECKSUM_NAME }}
+        shell: pwsh
+
+      - name: Publish release
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: "Euterpium ${{ env.RELEASE_TAG }}"
+          generate_release_notes: true
+          draft: false
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
