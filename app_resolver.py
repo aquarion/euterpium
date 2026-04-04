@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 try:
     import windowsapps
+
     WINDOWSAPPS_AVAILABLE = True
     logger.info("windowsapps loaded — enhanced app name resolution enabled")
 except ImportError as e:
@@ -20,15 +21,15 @@ except ImportError as e:
 def resolve_app_name(app_id: str) -> str:
     """
     Convert an application identifier to a friendly name.
-    
+
     Handles various formats:
     - Executable names (e.g., "spotify.exe")
     - Windows Store AUMIDs (e.g., "Microsoft.ZuneMusic_8wekyb3d8bbwe!Microsoft.ZuneMusic")
     - Package family names and other identifiers
-    
+
     Args:
         app_id: Application identifier from SMTC or other Windows APIs
-        
+
     Returns:
         Friendly application name, or a cleaned version of the input if resolution fails
     """
@@ -37,7 +38,7 @@ def resolve_app_name(app_id: str) -> str:
         return "unknown"
 
     lowered = raw.lower()
-    
+
     # Check for executable names first (fastest path)
     exe_match = re.search(r"([a-z0-9_-]+\.exe)", lowered)
     if exe_match:
@@ -58,10 +59,10 @@ def _resolve_app_name_from_aumid(app_id: str) -> str | None:
     """
     Resolve a friendly app name from an Application User Model ID (AUMID).
     First tries windowsapps package, falls back to registry search if needed.
-    
+
     Args:
         app_id: Windows Application User Model ID
-        
+
     Returns:
         Friendly application name, or None if resolution fails
     """
@@ -77,23 +78,23 @@ def _resolve_app_name_from_aumid(app_id: str) -> str | None:
                 app_name, found_app_id = result
                 logger.debug(f"windowsapps: resolved '{app_id}' to '{app_name}'")
                 return app_name.strip()
-            
+
             # For partial matches, get all apps and search manually
             apps = windowsapps.get_apps()
             app_id_lower = app_id.lower()
-            
+
             # Try exact match first
             for name, aid in apps.items():
                 if aid.lower() == app_id_lower:
                     logger.debug(f"windowsapps: exact match '{app_id}' to '{name}'")
                     return name.strip()
-            
+
             # Try partial matches for package family names in AUMID
             for name, aid in apps.items():
                 if app_id_lower in aid.lower() or aid.lower() in app_id_lower:
                     logger.debug(f"windowsapps: partial match '{app_id}' to '{name}' (aid: {aid})")
                     return name.strip()
-                    
+
             logger.debug(f"windowsapps: no match found for AUMID '{app_id}'")
         except Exception as e:
             logger.debug(f"windowsapps lookup failed for '{app_id}': {e}")
@@ -105,10 +106,10 @@ def _resolve_app_name_from_aumid(app_id: str) -> str | None:
 def _resolve_from_registry(app_id: str) -> str | None:
     """
     Fallback resolution using Windows registry lookup.
-    
+
     Args:
         app_id: Application User Model ID
-        
+
     Returns:
         Application name from registry, or None if not found
     """
