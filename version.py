@@ -28,11 +28,24 @@ def _detect_git_branch() -> str | None:
     return None
 
 
-__version__ = "0.1.0"
+def _compute_display_version(version_str: str) -> str:
+    """Compute display version based on the current version string.
+
+    Args:
+        version_str: The current __version__ value
+
+    Returns:
+        Display version string: version_str for releases, git branch or 'dev' for development
+    """
+    if version_str != DEV_VERSION:
+        return version_str
+    else:
+        return _detect_git_branch() or "dev"
+
+
+DEV_VERSION = "0.1.0"
+__version__ = DEV_VERSION
 
 # In release builds, the workflow replaces __version__ with the actual version
 # For development builds, show the git branch or "dev"
-if __version__ != "0.1.0":
-    __display_version__ = __version__
-else:
-    __display_version__ = _detect_git_branch() or "dev"
+__display_version__ = _compute_display_version(__version__)

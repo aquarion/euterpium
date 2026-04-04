@@ -31,19 +31,38 @@ def test_detect_git_branch_returns_none_when_git_fails(monkeypatch):
     assert version._detect_git_branch() is None
 
 
-def test_display_version_uses_hardcoded_version_in_release_build(monkeypatch):
+def test_display_version_uses_hardcoded_version_in_release_build():
     """When __version__ is not the default, use it as display version (release build)."""
-    # Simulate what happens in a release build - the workflow replaces __version__
-    # We'll test the logic directly rather than reloading the module
-
-    # The release logic should be: if __version__ != "0.1.0", use __version__
+    # Test the actual production code path by calling the helper function
     test_version = "1.2.3"
-    if test_version != "0.1.0":
-        expected_display = test_version
-    else:
-        expected_display = version._detect_git_branch() or "dev"
+    result = version._compute_display_version(test_version)
+    assert result == "1.2.3"
 
-    assert expected_display == "1.2.3"
+
+def test_display_version_uses_dev_path_for_development_build(monkeypatch):
+    """When __version__ is the default, use git branch detection."""
+
+    def fake_run(*args, **kwargs):
+        return subprocess.CompletedProcess(args=args, returncode=0, stdout="feature/test-branch\n")
+
+    monkeypatch.setattr(version.subprocess, "run", fake_run)
+
+    # Test the actual production code path
+    result = version._compute_display_version(version.DEV_VERSION)
+    assert result == "feature/test-branch"
+
+
+def test_display_version_dev_fallback_when_git_unavailable(monkeypatch):
+    """When __version__ is default and git fails, fall back to 'dev'."""
+
+    def fake_run(*args, **kwargs):
+        raise OSError("git not found")
+
+    monkeypatch.setattr(version.subprocess, "run", fake_run)
+
+    # Test the actual production code path
+    result = version._compute_display_version(version.DEV_VERSION)
+    assert result == "dev"
 
 
 def test_display_version_uses_branch_name_in_dev_build(monkeypatch):
