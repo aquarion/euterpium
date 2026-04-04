@@ -38,7 +38,8 @@ def test_version_defaults_to_dev_when_git_unavailable(monkeypatch):
     monkeypatch.setattr(version.subprocess, "run", fake_run)
 
     reloaded = importlib.reload(version)
-    assert reloaded.__version__ == "dev"
+    assert reloaded.__version__ == "0.1.0"
+    assert reloaded.__display_version__ == "dev"
 
 
 def test_version_uses_branch_name_when_available(monkeypatch):
@@ -48,4 +49,5 @@ def test_version_uses_branch_name_when_available(monkeypatch):
     monkeypatch.setattr(version.subprocess, "run", fake_run)
 
     reloaded = importlib.reload(version)
-    assert reloaded.__version__ == "feature/my-branch"
+    assert reloaded.__version__ == "0.1.0"
+    assert reloaded.__display_version__ == "feature/my-branch"

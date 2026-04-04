@@ -11,7 +11,7 @@ from ui.notifications import notify_track, notify_update_available
 from ui.tray import TrayIcon
 from ui.window import MainWindow
 from updater import UpdateManager, cleanup_stale_update_dirs
-from version import __version__
+from version import __display_version__, __version__
 
 # Configure logging before any local imports so module-level log messages
 # (e.g. winsdk availability) are captured from the start
@@ -59,7 +59,7 @@ def main():
         on_quit=on_quit,
         on_show_settings=on_show_settings,
         on_fingerprint_now=on_fingerprint_now,
-        current_version=__version__,
+        current_version=__display_version__,
     )
     tray = TrayIcon(
         on_show_window=lambda: window.show(),
@@ -67,7 +67,7 @@ def main():
         on_quit=on_quit,
         on_check_for_updates=on_check_for_updates,
         on_install_update=on_install_update,
-        current_version=__version__,
+        current_version=__display_version__,
     )
     tracker = Tracker(event_queue=event_queue)
     update_manager = UpdateManager(event_queue=event_queue, current_version=__version__)
@@ -106,8 +106,7 @@ def main():
 
             elif kind == "delivery":
                 _, message, level = msg
-                window_level = "info" if level == "success" else level
-                window.log_status(message, level=window_level)
+                window.log_status(message, level=level)
                 window.set_delivery_status(message, level)
                 if level == "error":
                     logger.error(message)

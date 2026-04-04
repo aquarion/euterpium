@@ -108,6 +108,12 @@ def test_different_sources_are_not_same(tracker):
     assert tracker._tracks_are_same(a, b) is False
 
 
+def test_smtc_excluded_state_transition_is_not_same(tracker):
+    a = {"title": "Song", "source": "smtc", "source_app": "spotify.exe", "excluded": False}
+    b = {"title": "Song", "source": "smtc", "source_app": "spotify.exe", "excluded": True}
+    assert tracker._tracks_are_same(a, b) is False
+
+
 # ── Manual Fingerprinting ────────────────────────────────────────────────────────
 
 

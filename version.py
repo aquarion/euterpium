@@ -30,4 +30,5 @@ def _detect_git_branch() -> str | None:
     return branch
 
 
-__version__ = _detect_git_branch() or "dev"
+__version__ = "0.1.0"
+__display_version__ = _detect_git_branch() or "dev"

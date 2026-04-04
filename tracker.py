@@ -227,6 +227,10 @@ class Tracker:
         if a.get("source") == "smtc":
             if (a.get("source_app") or "").lower() != (b.get("source_app") or "").lower():
                 return False
+            if bool(a.get("excluded")) != bool(b.get("excluded")):
+                return False
+            if (a.get("excluded_pattern") or "") != (b.get("excluded_pattern") or ""):
+                return False
 
         # Compare games - same title from different games is different
         a_game = a.get("_game")
