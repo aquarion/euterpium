@@ -270,8 +270,18 @@ class MainWindow:
         self._append_history_entry(entry, tag)
 
     def _append_log(self, message: str, level: str = "info"):
-        self._append_history_entry(message, level)
-        self._lbl_status.config(text=message, fg=TEXT_RED if level == "error" else TEXT_DIM)
+        history_tag = "error" if level == "error" else "dim"
+
+        status_color = TEXT_DIM
+        if level == "success":
+            status_color = TEXT_GREEN
+        elif level == "warn":
+            status_color = TEXT_GOLD
+        elif level == "error":
+            status_color = TEXT_RED
+
+        self._append_history_entry(message, history_tag)
+        self._lbl_status.config(text=message, fg=status_color)
 
     def _history_timestamp(self) -> str:
         return datetime.now().strftime("%H:%M:%S")

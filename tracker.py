@@ -161,11 +161,17 @@ class Tracker:
         source_name = track.get("source_app_name") or track.get("source_app") or "unknown"
         artist = track.get("artist", "")
         title = track.get("title", "")
-        if artist or title:
-            self._emit(
-                "status",
-                f"Ignored source ({source_name}): {artist} — {title}".strip(" —"),
-            )
+        if artist and title:
+            track_display = f"{artist} — {title}"
+        elif artist:
+            track_display = artist
+        elif title:
+            track_display = title
+        else:
+            track_display = ""
+
+        if track_display:
+            self._emit("status", f"Ignored source ({source_name}): {track_display}")
         else:
             self._emit("status", f"Ignored source ({source_name})")
         self._emit("delivery", f"Webhook skipped (excluded source: {source_name})", "warn")

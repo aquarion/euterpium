@@ -70,7 +70,7 @@ async def get_smtc_track(ignored_apps: list[str] | None = None) -> dict | None:
                 if pattern and pattern in app_id_lower:
                     excluded_pattern = pattern
                     logger.debug(
-                        f"SMTC: ignoring session from '{app_id_lower}' (matches '{pattern}')"
+                        f"SMTC: marking session from '{app_id_lower}' as excluded (matches '{pattern}')"
                     )
                     break
 
