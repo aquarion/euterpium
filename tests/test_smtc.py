@@ -27,11 +27,11 @@ def test_resolve_app_name_unknown_when_empty() -> None:
 def test_resolve_app_name_uses_aumid_resolver_for_opaque_id(monkeypatch) -> None:
     # Test that the app resolver tries multiple strategies and returns a reasonable result
     result = resolve_app_name("308046B0AF4A39CB")
-    
+
     # Should return something reasonable - either from windowsapps, registry, or cleaned fallback
     assert len(result) > 0
     assert result != "308046B0AF4A39CB"  # Should not return the raw input unchanged
-    
+
     # Should be lowercase and reasonable length
     assert result.islower()
     assert len(result) < 50  # Shouldn't be excessively long
