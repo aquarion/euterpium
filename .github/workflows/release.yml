@@ -118,17 +118,25 @@ jobs:
           echo "CHECKSUM_NAME=$checksum" >> $env:GITHUB_ENV
         shell: pwsh
 
-      - name: Create release
+      - name: Create draft release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           name: "Euterpium ${{ env.RELEASE_TAG }}"
           generate_release_notes: true
           draft: true
+          make_latest: false
+          overwrite_files: true
           files: |
             ${{ env.ZIP_NAME }}
             ${{ env.INSTALLER_NAME }}
             ${{ env.CHECKSUM_NAME }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish release
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
+        run: gh release edit ${{ env.RELEASE_TAG }} --draft=false --latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -138,15 +146,5 @@ jobs:
           Remove-Item ${{ env.INSTALLER_NAME }}
           Remove-Item ${{ env.CHECKSUM_NAME }}
         shell: pwsh
-
-      - name: Publish release
-        if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.RELEASE_TAG }}
-          name: "Euterpium ${{ env.RELEASE_TAG }}"
-          generate_release_notes: true
-          draft: false
-          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

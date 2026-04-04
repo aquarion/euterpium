@@ -84,40 +84,7 @@ jobs:
           git push origin "$NEXT_VERSION"
 
           echo "✅ Created and pushed tag: $NEXT_VERSION"
-
-      - name: Generate release notes
-        id: release_notes
-        run: |
-          LATEST_TAG="${{ steps.get_tag.outputs.latest_tag }}"
-          NEXT_VERSION="${{ steps.next_version.outputs.next_version }}"
-
-          # Generate commit log since last tag
-          if [ "$LATEST_TAG" == "v0.0.0" ]; then
-            COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges)
-          else
-            COMMITS=$(git log ${LATEST_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
-          fi
-
-          # Create release notes
-          cat > release_notes.md << EOF
-          ## What's Changed
-
-          ${COMMITS}
-
-          **Full Changelog**: https://github.com/${{ github.repository }}/compare/${LATEST_TAG}...${NEXT_VERSION}
-          EOF
-
-          echo "Release notes generated"
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.next_version.outputs.next_version }}
-          name: Release ${{ steps.next_version.outputs.next_version }}
-          body_path: release_notes.md
-          draft: false
-          prerelease: false
-          generate_release_notes: true
+          echo "The release.yml workflow will handle creating the GitHub release with artifacts"
 
   deploy:
     needs: [tag]
