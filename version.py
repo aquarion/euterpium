@@ -44,9 +44,12 @@ def _compute_display_version(version_str: str) -> str:
 
 
 DEV_VERSION = "0.1.0"
-# This is a number so that the replacement in the workflow works.
+# Keep this as a quoted string literal so the release workflow can replace it.
 __version__ = "0.1.0"
 
+assert (
+    DEV_VERSION == __version__
+), "DEV_VERSION must match __version__ so development display-version logic stays consistent."
 # In release builds, the workflow replaces __version__ with the actual version
 # For development builds, show the git branch or "dev"
 __display_version__ = _compute_display_version(__version__)
