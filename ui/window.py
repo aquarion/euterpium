@@ -156,9 +156,15 @@ class MainWindow:
         )
         self._lbl_delivery.pack(anchor="w", pady=(4, 0))
 
-        # ── Status bar (packed before list so it's always visible) ──────────
-        status_bar = tk.Frame(root, bg=BG_CARD, pady=6)
-        status_bar.pack(fill="x", side="bottom")
+        # ── Bottom rows (status + controls) ───────────────────────────────
+        bottom_bar = tk.Frame(root, bg=BG_CARD)
+        bottom_bar.pack(fill="x", side="bottom")
+
+        status_row = tk.Frame(bottom_bar, bg=BG_CARD, pady=4)
+        status_row.pack(fill="x")
+
+        controls_row = tk.Frame(bottom_bar, bg=BG_CARD, pady=6)
+        controls_row.pack(fill="x")
 
         # ── Recent tracks ─────────────────────────────────────────────────
         tk.Label(root, text="RECENT TRACKS", font=("Segoe UI", 8, "bold"), bg=BG, fg=TEXT_DIM).pack(
@@ -194,22 +200,22 @@ class MainWindow:
         self._history_box.tag_config("dim", foreground=TEXT_DIM)
 
         self._lbl_status = tk.Label(
-            status_bar, text="Running", font=("Segoe UI", 9), bg=BG_CARD, fg=TEXT_GREEN
+            status_row, text="Running", font=("Segoe UI", 9), bg=BG_CARD, fg=TEXT_GREEN
         )
         self._lbl_status.pack(side="left", padx=12)
 
         if self._current_version:
             self._lbl_version = tk.Label(
-                status_bar,
+                controls_row,
                 text=f"v{self._current_version}",
                 font=("Segoe UI", 9),
                 bg=BG_CARD,
                 fg=TEXT_DIM,
             )
-            self._lbl_version.pack(side="right", padx=(4, 12))
+            self._lbl_version.pack(side="left", padx=12)
 
         tk.Button(
-            status_bar,
+            controls_row,
             text="Quit",
             font=("Segoe UI", 9),
             bg=BG_CARD,
@@ -223,7 +229,7 @@ class MainWindow:
         ).pack(side="right", padx=12)
 
         tk.Button(
-            status_bar,
+            controls_row,
             text="Settings",
             font=("Segoe UI", 9),
             bg=BG_CARD,
@@ -237,7 +243,7 @@ class MainWindow:
         ).pack(side="right", padx=4)
 
         tk.Button(
-            status_bar,
+            controls_row,
             text="Fingerprint Now",
             font=("Segoe UI", 9),
             bg=BG_CARD,
