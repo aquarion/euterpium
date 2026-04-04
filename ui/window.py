@@ -7,8 +7,12 @@ import threading
 import tkinter as tk
 from datetime import datetime
 from tkinter import ttk
+from typing import TYPE_CHECKING
 
 from ui.settings_window import SettingsWindow
+
+if TYPE_CHECKING:
+    from updater import AvailableUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +64,8 @@ class MainWindow:
     def set_delivery_status(self, message: str, level: str = "info"):
         self._queue.put(("delivery", message, level))
 
-    def set_available_update(self, update_info):
-        self._queue.put(("update_available", update_info))
+    def set_available_update(self, update_info: "AvailableUpdate | None"):
+        self._queue.put(("update_state", update_info))
 
     def show(self):
         self._queue.put(("show",))
@@ -101,7 +105,7 @@ class MainWindow:
         elif kind == "delivery":
             _, text, level = msg
             self._set_delivery_status(text, level)
-        elif kind == "update_available":
+        elif kind == "update_state":
             _, update_info = msg
             self._set_available_update(update_info)
         elif kind == "show":
@@ -353,7 +357,7 @@ class MainWindow:
             color = TEXT_RED
         self._lbl_delivery.config(text=f"Webhook: {message}", fg=color)
 
-    def _set_available_update(self, update_info):
+    def _set_available_update(self, update_info: "AvailableUpdate | None"):
         """Show or hide the update button based on update availability."""
         if update_info and self.on_install_update:
             # Show update button next to version only when it can be used
