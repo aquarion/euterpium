@@ -34,9 +34,53 @@ def _source_app_name(app_id: str) -> str:
     if exe_match:
         return exe_match.group(1)
 
+    resolved = _resolve_app_name_from_aumid(raw)
+    if resolved:
+        return resolved.lower()
+
     cleaned = lowered.replace("!", ".")
     parts = [p for p in cleaned.split(".") if p]
     return parts[-1] if parts else lowered
+
+
+def _resolve_app_name_from_aumid(app_id: str) -> str | None:
+    if sys.platform != "win32":
+        return None
+
+    try:
+        import winreg
+    except ImportError:
+        return None
+
+    key_paths = [
+        (winreg.HKEY_CURRENT_USER, rf"Software\Classes\AppUserModelId\{app_id}"),
+        (winreg.HKEY_CLASSES_ROOT, rf"AppUserModelId\{app_id}"),
+    ]
+
+    value_names = ["RelaunchCommand", "ApplicationName", "DisplayName"]
+    for hive, key_path in key_paths:
+        try:
+            with winreg.OpenKey(hive, key_path) as key:
+                for value_name in value_names:
+                    try:
+                        value, _ = winreg.QueryValueEx(key, value_name)
+                    except OSError:
+                        continue
+
+                    if not value:
+                        continue
+
+                    value_str = str(value).strip()
+                    exe_match = re.search(r"([a-z0-9_-]+\.exe)", value_str.lower())
+                    if exe_match:
+                        return exe_match.group(1)
+
+                    if value_name in {"ApplicationName", "DisplayName"}:
+                        return value_str
+        except OSError:
+            continue
+
+    return None
 
 
 async def get_smtc_track(ignored_apps: list[str] | None = None) -> dict | None:
@@ -66,8 +110,9 @@ async def get_smtc_track(ignored_apps: list[str] | None = None) -> dict | None:
         excluded_pattern = None
         if ignored_apps:
             app_id_lower = app_id.lower()
+            app_name_lower = app_name.lower()
             for pattern in ignored_apps:
-                if pattern and pattern in app_id_lower:
+                if pattern and (pattern in app_id_lower or pattern in app_name_lower):
                     excluded_pattern = pattern
                     logger.debug(
                         f"SMTC: marking session from '{app_id_lower}' as excluded (matches '{pattern}')"

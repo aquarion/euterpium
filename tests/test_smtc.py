@@ -1,3 +1,4 @@
+import smtc
 from smtc import _source_app_name
 
 
@@ -15,3 +16,15 @@ def test_source_app_name_from_uwp_id() -> None:
 
 def test_source_app_name_unknown_when_empty() -> None:
     assert _source_app_name("") == "unknown"
+
+
+def test_source_app_name_uses_aumid_resolver_for_opaque_id(monkeypatch) -> None:
+    monkeypatch.setattr(smtc, "_resolve_app_name_from_aumid", lambda app_id: "foobar.exe")
+
+    assert _source_app_name("308046B0AF4A39CB") == "foobar.exe"
+
+
+def test_resolve_app_name_from_aumid_returns_none_off_windows(monkeypatch) -> None:
+    monkeypatch.setattr(smtc.sys, "platform", "linux")
+
+    assert smtc._resolve_app_name_from_aumid("308046B0AF4A39CB") is None
