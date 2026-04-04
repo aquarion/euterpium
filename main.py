@@ -59,6 +59,7 @@ def main():
         on_quit=on_quit,
         on_show_settings=on_show_settings,
         on_fingerprint_now=on_fingerprint_now,
+        on_install_update=on_install_update,
         current_version=__display_version__,
     )
     tray = TrayIcon(
@@ -124,6 +125,7 @@ def main():
                 _, update = msg
                 # Always sync tray state — clears stale "Install update" when update is None.
                 tray.set_available_update(update)
+                window.set_available_update(update)
 
             elif kind == "update_available":
                 _, update = msg

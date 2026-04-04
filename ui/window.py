@@ -7,8 +7,12 @@ import threading
 import tkinter as tk
 from datetime import datetime
 from tkinter import ttk
+from typing import TYPE_CHECKING
 
 from ui.settings_window import SettingsWindow
+
+if TYPE_CHECKING:
+    from updater import AvailableUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +40,13 @@ class MainWindow:
         on_quit,
         on_show_settings=None,
         on_fingerprint_now=None,
+        on_install_update=None,
         current_version: str = "",
     ):
         self.on_quit = on_quit
         self.on_show_settings = on_show_settings
         self.on_fingerprint_now = on_fingerprint_now
+        self.on_install_update = on_install_update
         self._current_version = current_version
         self._root: tk.Tk | None = None
         self._visible = False
@@ -57,6 +63,9 @@ class MainWindow:
 
     def set_delivery_status(self, message: str, level: str = "info"):
         self._queue.put(("delivery", message, level))
+
+    def set_available_update(self, update_info: "AvailableUpdate | None"):
+        self._queue.put(("update_state", update_info))
 
     def show(self):
         self._queue.put(("show",))
@@ -96,6 +105,9 @@ class MainWindow:
         elif kind == "delivery":
             _, text, level = msg
             self._set_delivery_status(text, level)
+        elif kind == "update_state":
+            _, update_info = msg
+            self._set_available_update(update_info)
         elif kind == "show":
             self._show()
         elif kind == "hide":
@@ -207,12 +219,28 @@ class MainWindow:
         if self._current_version:
             self._lbl_version = tk.Label(
                 controls_row,
-                text=f"v{self._current_version}",
+                text=f"{self._current_version}",
                 font=("Segoe UI", 9),
                 bg=BG_CARD,
                 fg=TEXT_DIM,
             )
             self._lbl_version.pack(side="left", padx=12)
+
+        # Update button (initially hidden)
+        self._btn_update = tk.Button(
+            controls_row,
+            text="Install Update",
+            font=("Segoe UI", 9),
+            bg=ACCENT,
+            fg=BG,
+            relief="flat",
+            bd=0,
+            cursor="hand2",
+            activebackground=ACCENT,
+            activeforeground=BG,
+            command=self._install_update,
+        )
+        self._btn_update.pack_forget()  # Initially hidden
 
         tk.Button(
             controls_row,
@@ -328,6 +356,22 @@ class MainWindow:
         elif level == "error":
             color = TEXT_RED
         self._lbl_delivery.config(text=f"Webhook: {message}", fg=color)
+
+    def _set_available_update(self, update_info: "AvailableUpdate | None"):
+        """Show or hide the update button based on update availability."""
+        if update_info and self.on_install_update:
+            # Show update button next to version only when it can be used
+            self._btn_update.config(state="normal")
+            self._btn_update.pack(side="left", padx=(4, 12))
+        else:
+            # Hide update button when no update is available or no handler exists
+            self._btn_update.config(state="disabled")
+            self._btn_update.pack_forget()
+
+    def _install_update(self):
+        """Handle update button click."""
+        if self.on_install_update:
+            self.on_install_update()
 
     def _show(self):
         self._root.deiconify()
