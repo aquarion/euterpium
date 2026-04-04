@@ -4,8 +4,9 @@
 
 import asyncio
 import logging
-import re
 import sys
+
+from app_resolver import resolve_app_name
 
 logger = logging.getLogger(__name__)
 
@@ -22,65 +23,6 @@ except ImportError as e:
     logger.warning(
         f"winsdk not available ({e}) — SMTC detection disabled. Install with: pip install winsdk"
     )
-
-
-def _source_app_name(app_id: str) -> str:
-    raw = (app_id or "unknown").strip()
-    if not raw:
-        return "unknown"
-
-    lowered = raw.lower()
-    exe_match = re.search(r"([a-z0-9_-]+\.exe)", lowered)
-    if exe_match:
-        return exe_match.group(1)
-
-    resolved = _resolve_app_name_from_aumid(raw)
-    if resolved:
-        return resolved.lower()
-
-    cleaned = lowered.replace("!", ".")
-    parts = [p for p in cleaned.split(".") if p]
-    return parts[-1] if parts else lowered
-
-
-def _resolve_app_name_from_aumid(app_id: str) -> str | None:
-    if sys.platform != "win32":
-        return None
-
-    try:
-        import winreg
-    except ImportError:
-        return None
-
-    key_paths = [
-        (winreg.HKEY_CURRENT_USER, rf"Software\Classes\AppUserModelId\{app_id}"),
-        (winreg.HKEY_CLASSES_ROOT, rf"AppUserModelId\{app_id}"),
-    ]
-
-    value_names = ["RelaunchCommand", "ApplicationName", "DisplayName"]
-    for hive, key_path in key_paths:
-        try:
-            with winreg.OpenKey(hive, key_path) as key:
-                for value_name in value_names:
-                    try:
-                        value, _ = winreg.QueryValueEx(key, value_name)
-                    except OSError:
-                        continue
-
-                    if not value:
-                        continue
-
-                    value_str = str(value).strip()
-                    exe_match = re.search(r"([a-z0-9_-]+\.exe)", value_str.lower())
-                    if exe_match:
-                        return exe_match.group(1)
-
-                    if value_name in {"ApplicationName", "DisplayName"}:
-                        return value_str
-        except OSError:
-            continue
-
-    return None
 
 
 async def get_smtc_track(ignored_apps: list[str] | None = None) -> dict | None:
@@ -105,7 +47,7 @@ async def get_smtc_track(ignored_apps: list[str] | None = None) -> dict | None:
             return None
 
         app_id = current.source_app_user_model_id or "unknown"
-        app_name = _source_app_name(app_id)
+        app_name = resolve_app_name(app_id)
 
         excluded_pattern = None
         if ignored_apps:
