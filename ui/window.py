@@ -355,11 +355,13 @@ class MainWindow:
 
     def _set_available_update(self, update_info):
         """Show or hide the update button based on update availability."""
-        if update_info:
-            # Show update button next to version
+        if update_info and self.on_install_update:
+            # Show update button next to version only when it can be used
+            self._btn_update.config(state="normal")
             self._btn_update.pack(side="left", padx=(4, 12))
         else:
-            # Hide update button
+            # Hide update button when no update is available or no handler exists
+            self._btn_update.config(state="disabled")
             self._btn_update.pack_forget()
 
     def _install_update(self):
