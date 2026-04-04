@@ -6,6 +6,8 @@ import asyncio
 import logging
 import sys
 
+from app_resolver import resolve_app_name
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -13,11 +15,14 @@ try:
     from winsdk.windows.media.control import (
         GlobalSystemMediaTransportControlsSessionManager as MediaManager,
     )
+
     WINSDK_AVAILABLE = True
     logger.info("winsdk loaded — SMTC detection enabled")
 except ImportError as e:
     WINSDK_AVAILABLE = False
-    logger.warning(f"winsdk not available ({e}) — SMTC detection disabled. Install with: pip install winsdk")
+    logger.warning(
+        f"winsdk not available ({e}) — SMTC detection disabled. Install with: pip install winsdk"
+    )
 
 
 async def get_smtc_track(ignored_apps: list[str] | None = None) -> dict | None:
@@ -26,7 +31,9 @@ async def get_smtc_track(ignored_apps: list[str] | None = None) -> dict | None:
     or None if nothing is playing / winsdk is unavailable.
 
     ignored_apps: list of lowercase substrings — any session whose
-    source_app_user_model_id contains one of these is skipped.
+    source_app_user_model_id contains one of these is returned with
+    ``excluded=True`` metadata so callers can emit debug/delivery state
+    without treating it as a playable now-playing track.
     """
     if not WINSDK_AVAILABLE:
         return None
@@ -39,12 +46,20 @@ async def get_smtc_track(ignored_apps: list[str] | None = None) -> dict | None:
             logger.debug("SMTC: no active session")
             return None
 
+        app_id = current.source_app_user_model_id or "unknown"
+        app_name = resolve_app_name(app_id)
+
+        excluded_pattern = None
         if ignored_apps:
-            app_id = (current.source_app_user_model_id or "").lower()
+            app_id_lower = app_id.lower()
+            app_name_lower = app_name.lower()
             for pattern in ignored_apps:
-                if pattern and pattern in app_id:
-                    logger.debug(f"SMTC: ignoring session from '{app_id}' (matches '{pattern}')")
-                    return None
+                if pattern and (pattern in app_id_lower or pattern in app_name_lower):
+                    excluded_pattern = pattern
+                    logger.debug(
+                        f"SMTC: marking session from '{app_id_lower}' as excluded (matches '{pattern}')"
+                    )
+                    break
 
         info = await current.try_get_media_properties_async()
         playback = current.get_playback_info()
@@ -74,10 +89,24 @@ async def get_smtc_track(ignored_apps: list[str] | None = None) -> dict | None:
         else:
             artist, album = raw_artist, raw_album
 
-        app_id = current.source_app_user_model_id or "unknown"
         logger.debug(f"SMTC: found '{artist} — {title}' (album: {album!r}, app: {app_id})")
+
+        if excluded_pattern is not None:
+            return {
+                "source": "smtc",
+                "source_app": app_id,
+                "source_app_name": app_name,
+                "excluded": True,
+                "excluded_pattern": excluded_pattern,
+                "title": title,
+                "artist": artist,
+                "album": album,
+            }
+
         return {
             "source": "smtc",
+            "source_app": app_id,
+            "source_app_name": app_name,
             "title": title,
             "artist": artist,
             "album": album,

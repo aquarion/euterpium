@@ -12,11 +12,11 @@ import config
 logger = logging.getLogger(__name__)
 
 # Colour palette (matches window.py)
-BG       = "#1e1e2e"
-BG_CARD  = "#2a2a3e"
+BG = "#1e1e2e"
+BG_CARD = "#2a2a3e"
 BG_INPUT = "#313145"
-ACCENT   = "#cba6f7"
-TEXT     = "#cdd6f4"
+ACCENT = "#cba6f7"
+TEXT = "#cdd6f4"
 TEXT_DIM = "#6c7086"
 TEXT_RED = "#f38ba8"
 TEXT_GREEN = "#a6e3a1"
@@ -24,11 +24,7 @@ TEXT_GREEN = "#a6e3a1"
 
 def _styled_label(parent, text, dim=False, **kwargs):
     return tk.Label(
-        parent, text=text,
-        bg=BG_CARD,
-        fg=TEXT_DIM if dim else TEXT,
-        font=("Segoe UI", 9),
-        **kwargs
+        parent, text=text, bg=BG_CARD, fg=TEXT_DIM if dim else TEXT, font=("Segoe UI", 9), **kwargs
     )
 
 
@@ -36,9 +32,11 @@ def _styled_entry(parent, textvariable, show=None, width=38):
     return tk.Entry(
         parent,
         textvariable=textvariable,
-        bg=BG_INPUT, fg=TEXT,
+        bg=BG_INPUT,
+        fg=TEXT,
         insertbackground=TEXT,
-        relief="flat", bd=4,
+        relief="flat",
+        bd=4,
         font=("Segoe UI", 10),
         show=show,
         width=width,
@@ -77,19 +75,29 @@ class SettingsWindow:
         btn_row.pack(fill="x", padx=12, side="bottom")
 
         tk.Button(
-            btn_row, text="Save", width=10,
-            bg=ACCENT, fg=BG,
+            btn_row,
+            text="Save",
+            width=10,
+            bg=ACCENT,
+            fg=BG,
             font=("Segoe UI", 9, "bold"),
-            relief="flat", bd=0, cursor="hand2",
+            relief="flat",
+            bd=0,
+            cursor="hand2",
             activebackground=ACCENT,
             command=self._save,
         ).pack(side="right", padx=(6, 0))
 
         tk.Button(
-            btn_row, text="Cancel", width=10,
-            bg=BG_CARD, fg=TEXT_DIM,
+            btn_row,
+            text="Cancel",
+            width=10,
+            bg=BG_CARD,
+            fg=TEXT_DIM,
             font=("Segoe UI", 9),
-            relief="flat", bd=0, cursor="hand2",
+            relief="flat",
+            bd=0,
+            cursor="hand2",
             activebackground=BG_CARD,
             command=win.destroy,
         ).pack(side="right")
@@ -102,37 +110,46 @@ class SettingsWindow:
             footer,
             text=f"Config: {config.config_path()}",
             font=("Segoe UI", 8),
-            bg=BG, fg=TEXT_DIM,
+            bg=BG,
+            fg=TEXT_DIM,
             anchor="w",
         ).pack(side="left")
 
         tk.Button(
-            footer, text="Open folder",
+            footer,
+            text="Open folder",
             font=("Segoe UI", 8),
-            bg=BG, fg=TEXT_DIM,
-            relief="flat", bd=0, cursor="hand2",
-            activebackground=BG, activeforeground=ACCENT,
+            bg=BG,
+            fg=TEXT_DIM,
+            relief="flat",
+            bd=0,
+            cursor="hand2",
+            activebackground=BG,
+            activeforeground=ACCENT,
             command=self._open_config_folder,
         ).pack(side="left", padx=(8, 0))
 
         # ── Notebook (tabs — fills remaining space) ───────────────────────
         style = ttk.Style(win)
         style.theme_use("default")
-        style.configure("TNotebook",       background=BG,      borderwidth=0)
-        style.configure("TNotebook.Tab",   background=BG_CARD, foreground=TEXT_DIM,
-                        padding=[12, 6],   font=("Segoe UI", 9))
-        style.map("TNotebook.Tab",
-                  background=[("selected", BG)],
-                  foreground=[("selected", ACCENT)])
+        style.configure("TNotebook", background=BG, borderwidth=0)
+        style.configure(
+            "TNotebook.Tab",
+            background=BG_CARD,
+            foreground=TEXT_DIM,
+            padding=[12, 6],
+            font=("Segoe UI", 9),
+        )
+        style.map("TNotebook.Tab", background=[("selected", BG)], foreground=[("selected", ACCENT)])
         style.configure("TFrame", background=BG_CARD)
 
         nb = ttk.Notebook(win)
         nb.pack(fill="both", expand=True, padx=12, pady=12)
 
-        creds_tab  = ttk.Frame(nb, padding=16)
-        audio_tab  = ttk.Frame(nb, padding=16)
-        media_tab  = ttk.Frame(nb, padding=16)
-        games_tab  = ttk.Frame(nb, padding=16)
+        creds_tab = ttk.Frame(nb, padding=16)
+        audio_tab = ttk.Frame(nb, padding=16)
+        media_tab = ttk.Frame(nb, padding=16)
+        games_tab = ttk.Frame(nb, padding=16)
 
         nb.add(creds_tab, text="Credentials")
         nb.add(audio_tab, text="Audio")
@@ -147,24 +164,26 @@ class SettingsWindow:
     # ── Credentials tab ───────────────────────────────────────────────────────
 
     def _build_credentials(self, parent):
-        self._acr_host   = tk.StringVar(value=config.get_acrcloud_host())
-        self._acr_key    = tk.StringVar(value=config.get_acrcloud_access_key())
+        self._acr_host = tk.StringVar(value=config.get_acrcloud_host())
+        self._acr_key = tk.StringVar(value=config.get_acrcloud_access_key())
         self._acr_secret = tk.StringVar(value=config.get_acrcloud_access_secret())
 
         # ACRCloud section
-        tk.Label(parent, text="ACRCLOUD", bg=BG_CARD,
-                 fg=TEXT_DIM, font=("Segoe UI", 8, "bold")).pack(anchor="w", pady=(10, 2))
+        tk.Label(
+            parent, text="ACRCLOUD", bg=BG_CARD, fg=TEXT_DIM, font=("Segoe UI", 8, "bold")
+        ).pack(anchor="w", pady=(10, 2))
         for label, var, secret in [
-            ("Host",          self._acr_host,   False),
-            ("Access Key",    self._acr_key,    False),
+            ("Host", self._acr_host, False),
+            ("Access Key", self._acr_key, False),
             ("Access Secret", self._acr_secret, True),
         ]:
             _styled_label(parent, label).pack(anchor="w", pady=(6, 1))
             _styled_entry(parent, var, show="•" if secret else None).pack(anchor="w")
 
         # API profiles section
-        tk.Label(parent, text="YOUR API", bg=BG_CARD,
-                 fg=TEXT_DIM, font=("Segoe UI", 8, "bold")).pack(anchor="w", pady=(16, 2))
+        tk.Label(
+            parent, text="YOUR API", bg=BG_CARD, fg=TEXT_DIM, font=("Segoe UI", 8, "bold")
+        ).pack(anchor="w", pady=(16, 2))
 
         # State: {name: {url: StringVar, key: StringVar}}
         self._api_profiles: dict[str, dict[str, tk.StringVar]] = {}
@@ -185,11 +204,15 @@ class SettingsWindow:
 
         self._profile_listbox = tk.Listbox(
             list_col,
-            bg=BG_INPUT, fg=TEXT,
-            selectbackground=ACCENT, selectforeground=BG,
+            bg=BG_INPUT,
+            fg=TEXT,
+            selectbackground=ACCENT,
+            selectforeground=BG,
             font=("Segoe UI", 10),
-            relief="flat", bd=4,
-            width=12, height=6,
+            relief="flat",
+            bd=4,
+            width=12,
+            height=6,
             exportselection=False,
         )
         self._profile_listbox.pack(fill="x")
@@ -200,8 +223,11 @@ class SettingsWindow:
         detail_col.pack(side="left", fill="both", expand=True)
 
         self._profile_name_label = tk.Label(
-            detail_col, text="", bg=BG_CARD,
-            fg=ACCENT, font=("Segoe UI", 9, "bold"),
+            detail_col,
+            text="",
+            bg=BG_CARD,
+            fg=ACCENT,
+            font=("Segoe UI", 9, "bold"),
         )
         self._profile_name_label.pack(anchor="w")
 
@@ -226,13 +252,23 @@ class SettingsWindow:
         btn_row = tk.Frame(parent, bg=BG_CARD)
         btn_row.pack(fill="x", pady=(4, 0))
 
-        for text, cmd in [("+ Add", self._add_profile), ("Rename", self._rename_profile), ("− Remove", self._remove_profile), ("Set Active", self._set_active_profile)]:
+        for text, cmd in [
+            ("+ Add", self._add_profile),
+            ("Rename", self._rename_profile),
+            ("− Remove", self._remove_profile),
+            ("Set Active", self._set_active_profile),
+        ]:
             tk.Button(
-                btn_row, text=text,
-                bg=BG_CARD, fg=TEXT_DIM,
+                btn_row,
+                text=text,
+                bg=BG_CARD,
+                fg=TEXT_DIM,
                 font=("Segoe UI", 8),
-                relief="flat", bd=0, cursor="hand2",
-                activebackground=BG_CARD, activeforeground=ACCENT,
+                relief="flat",
+                bd=0,
+                cursor="hand2",
+                activebackground=BG_CARD,
+                activeforeground=ACCENT,
                 command=cmd,
             ).pack(side="left", padx=(0, 8))
 
@@ -273,9 +309,7 @@ class SettingsWindow:
         self._detail_syncing = False
         active = self._active_profile.get()
         self._profile_name_label.config(text=name)
-        self._active_label.config(
-            text="(active)" if name == active else ""
-        )
+        self._active_label.config(text="(active)" if name == active else "")
 
     def _sync_detail_to_profile(self, *_):
         if self._detail_syncing or not self._selected_profile:
@@ -308,10 +342,14 @@ class SettingsWindow:
 
         entry.bind("<Return>", lambda _: confirm())
         tk.Button(
-            dialog, text="Add",
-            bg=ACCENT, fg=BG,
+            dialog,
+            text="Add",
+            bg=ACCENT,
+            fg=BG,
             font=("Segoe UI", 9, "bold"),
-            relief="flat", bd=0, cursor="hand2",
+            relief="flat",
+            bd=0,
+            cursor="hand2",
             activebackground=ACCENT,
             command=confirm,
         ).pack(anchor="e", padx=12, pady=8)
@@ -344,8 +382,7 @@ class SettingsWindow:
                 return
             # Rebuild dict preserving order
             self._api_profiles = {
-                (new_name if k == old_name else k): v
-                for k, v in self._api_profiles.items()
+                (new_name if k == old_name else k): v for k, v in self._api_profiles.items()
             }
             if self._active_profile.get() == old_name:
                 self._active_profile.set(new_name)
@@ -355,10 +392,14 @@ class SettingsWindow:
 
         entry.bind("<Return>", lambda _: confirm())
         tk.Button(
-            dialog, text="Rename",
-            bg=ACCENT, fg=BG,
+            dialog,
+            text="Rename",
+            bg=ACCENT,
+            fg=BG,
             font=("Segoe UI", 9, "bold"),
-            relief="flat", bd=0, cursor="hand2",
+            relief="flat",
+            bd=0,
+            cursor="hand2",
             activebackground=ACCENT,
             command=confirm,
         ).pack(anchor="e", padx=12, pady=8)
@@ -367,7 +408,9 @@ class SettingsWindow:
         if not self._selected_profile:
             return
         if self._selected_profile == self._active_profile.get():
-            messagebox.showwarning("Cannot remove", "Cannot remove the active profile.", parent=self._win)
+            messagebox.showwarning(
+                "Cannot remove", "Cannot remove the active profile.", parent=self._win
+            )
             return
         del self._api_profiles[self._selected_profile]
         self._selected_profile = None
@@ -381,24 +424,32 @@ class SettingsWindow:
     # ── Audio tab ─────────────────────────────────────────────────────────────
 
     def _build_audio(self, parent):
-        self._poll_interval  = tk.StringVar(value=str(config.get_poll_interval()))
-        self._capture_secs   = tk.StringVar(value=str(config.get_capture_seconds()))
-        self._threshold      = tk.StringVar(value=str(config.get_change_threshold()))
-        self._min_silence    = tk.StringVar(value=str(config.get_min_silence_before_change()))
+        self._poll_interval = tk.StringVar(value=str(config.get_poll_interval()))
+        self._capture_secs = tk.StringVar(value=str(config.get_capture_seconds()))
+        self._threshold = tk.StringVar(value=str(config.get_change_threshold()))
+        self._min_silence = tk.StringVar(value=str(config.get_min_silence_before_change()))
 
         fields = [
-            ("Poll interval (seconds)",
-             self._poll_interval,
-             "How often to sample audio energy when a game is running"),
-            ("Capture length (seconds)",
-             self._capture_secs,
-             "Length of audio sent to ACRCloud for fingerprinting"),
-            ("Change threshold (0.0 – 1.0)",
-             self._threshold,
-             "RMS energy delta that triggers a new recognition — raise if too sensitive"),
-            ("Min quiet checks before change",
-             self._min_silence,
-             "Consecutive silent samples before treating silence as a track change"),
+            (
+                "Poll interval (seconds)",
+                self._poll_interval,
+                "How often to sample audio energy when a game is running",
+            ),
+            (
+                "Capture length (seconds)",
+                self._capture_secs,
+                "Length of audio sent to ACRCloud for fingerprinting",
+            ),
+            (
+                "Change threshold (0.0 – 1.0)",
+                self._threshold,
+                "RMS energy delta that triggers a new recognition — raise if too sensitive",
+            ),
+            (
+                "Min quiet checks before change",
+                self._min_silence,
+                "Consecutive silent samples before treating silence as a track change",
+            ),
         ]
 
         for label, var, hint in fields:
@@ -428,10 +479,12 @@ class SettingsWindow:
 
         self._media_ignore_text = tk.Text(
             frame,
-            bg=BG_INPUT, fg=TEXT,
+            bg=BG_INPUT,
+            fg=TEXT,
             insertbackground=TEXT,
             font=("Consolas", 10),
-            relief="flat", bd=4,
+            relief="flat",
+            bd=4,
             yscrollcommand=scrollbar.set,
             wrap="none",
         )
@@ -458,10 +511,12 @@ class SettingsWindow:
 
         self._games_text = tk.Text(
             frame,
-            bg=BG_INPUT, fg=TEXT,
+            bg=BG_INPUT,
+            fg=TEXT,
             insertbackground=TEXT,
             font=("Consolas", 10),
-            relief="flat", bd=4,
+            relief="flat",
+            bd=4,
             yscrollcommand=scrollbar.set,
             wrap="none",
         )
@@ -478,10 +533,10 @@ class SettingsWindow:
     def _save(self):
         try:
             # Validate numeric fields
-            poll     = float(self._poll_interval.get())
-            capture  = float(self._capture_secs.get())
-            thresh   = float(self._threshold.get())
-            silence  = int(self._min_silence.get())
+            poll = float(self._poll_interval.get())
+            capture = float(self._capture_secs.get())
+            thresh = float(self._threshold.get())
+            silence = int(self._min_silence.get())
 
             if not (0 < poll <= 60):
                 raise ValueError("Poll interval must be between 0 and 60")
@@ -518,22 +573,24 @@ class SettingsWindow:
                 "key": vars_["key"].get().strip(),
             }
 
-        ok = config.save({
-            "acrcloud": {
-                "host":          self._acr_host.get().strip(),
-                "access_key":    self._acr_key.get().strip(),
-                "access_secret": self._acr_secret.get().strip(),
-            },
-            **api_sections,
-            "audio": {
-                "poll_interval":             str(poll),
-                "capture_seconds":           str(capture),
-                "change_threshold":          str(thresh),
-                "min_silence_before_change": str(silence),
-            },
-            "smtc": {"ignore": ", ".join(ignored)},
-            "games": games,
-        })
+        ok = config.save(
+            {
+                "acrcloud": {
+                    "host": self._acr_host.get().strip(),
+                    "access_key": self._acr_key.get().strip(),
+                    "access_secret": self._acr_secret.get().strip(),
+                },
+                **api_sections,
+                "audio": {
+                    "poll_interval": str(poll),
+                    "capture_seconds": str(capture),
+                    "change_threshold": str(thresh),
+                    "min_silence_before_change": str(silence),
+                },
+                "smtc": {"ignore": ", ".join(ignored)},
+                "games": games,
+            }
+        )
 
         if not ok:
             messagebox.showerror(

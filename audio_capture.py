@@ -20,11 +20,9 @@ def get_loopback_device():
     """Returns the default speaker's loopback device for capturing system audio."""
     try:
         import soundcard as sc
+
         default_speaker = sc.default_speaker()
-        loopback = sc.get_microphone(
-            id=str(default_speaker.name),
-            include_loopback=True
-        )
+        loopback = sc.get_microphone(id=str(default_speaker.name), include_loopback=True)
         return loopback
     except Exception as e:
         logger.error(f"Could not get loopback device: {e}")
@@ -75,7 +73,7 @@ def compute_rms(audio: np.ndarray) -> float:
     """Returns the RMS energy of an audio array (0.0–1.0 range)."""
     if audio.ndim > 1:
         audio = audio.mean(axis=1)
-    return float(np.sqrt(np.mean(audio ** 2)))
+    return float(np.sqrt(np.mean(audio**2)))
 
 
 class AudioChangeDetector:

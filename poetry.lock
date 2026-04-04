@@ -326,7 +326,7 @@ version = "8.0.1"
 description = "A Python utility / library to sort Python imports."
 optional = false
 python-versions = ">=3.10.0"
-groups = ["main"]
+groups = ["dev"]
 files = [
     {file = "isort-8.0.1-py3-none-any.whl", hash = "sha256:28b89bc70f751b559aeca209e6120393d43fbe2490de0559662be7a9787e3d75"},
     {file = "isort-8.0.1.tar.gz", hash = "sha256:171ac4ff559cdc060bcfff550bc8404a486fee0caab245679c2abe7cb253c78d"},
@@ -1045,6 +1045,22 @@ files = [
 "winrt-Windows.UI.Notifications" = "*"
 
 [[package]]
+name = "windowsapps"
+version = "0.0.9"
+description = "Windows Apps for python"
+optional = false
+python-versions = ">=3.6"
+groups = ["main"]
+files = []
+develop = false
+
+[package.source]
+type = "git"
+url = "https://github.com/aquarion/windowsapps"
+reference = "HEAD"
+resolved_reference = "140e7044e29e4f09e1666a16a5ec4f5f8216d9cb"
+
+[[package]]
 name = "winrt-runtime"
 version = "3.2.1"
 description = "Python projection of Windows Runtime (WinRT) APIs"
@@ -1538,4 +1554,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10"
-content-hash = "5092e0b4b8db0ae370d726b04ffac1548b87b88f57c38a52bbdedbdd9ae757dd"
+content-hash = "5444a8fcec07179923540b30a9d2ebfda6ea40686f51aba69916e416248c70c7"

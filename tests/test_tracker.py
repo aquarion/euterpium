@@ -108,6 +108,12 @@ def test_different_sources_are_not_same(tracker):
     assert tracker._tracks_are_same(a, b) is False
 
 
+def test_smtc_excluded_state_transition_is_not_same(tracker):
+    a = {"title": "Song", "source": "smtc", "source_app": "spotify.exe", "excluded": False}
+    b = {"title": "Song", "source": "smtc", "source_app": "spotify.exe", "excluded": True}
+    assert tracker._tracks_are_same(a, b) is False
+
+
 # ── Manual Fingerprinting ────────────────────────────────────────────────────────
 
 
@@ -192,6 +198,38 @@ def test_manual_fingerprint_smtc_fallback(
 @patch("tracker.config.get_acrcloud_host", return_value="host")
 @patch("tracker.config.acrcloud_is_configured", return_value=True)
 @patch("tracker.get_running_game")
+@patch("tracker.get_smtc_track_sync")
+def test_manual_fingerprint_ignored_smtc_source_emits_debug_not_track(
+    mock_smtc, mock_game, mock_is_configured, mock_host, running_tracker
+):
+    mock_game.return_value = None
+    mock_smtc.return_value = {
+        "source": "smtc",
+        "source_app": "firefox.exe",
+        "source_app_name": "firefox.exe",
+        "excluded": True,
+        "title": "Song",
+        "artist": "Artist",
+    }
+
+    events = []
+
+    def capture_events():
+        while not running_tracker.event_queue.empty():
+            events.append(running_tracker.event_queue.get())
+
+    running_tracker.force_fingerprint()
+    time.sleep(0.1)
+    capture_events()
+
+    assert not any(e[0] == "track" for e in events)
+    assert any(e[0] == "status" and "Ignored source (firefox.exe)" in e[1] for e in events)
+    assert any(e[0] == "delivery" and "excluded source" in e[1] for e in events)
+
+
+@patch("tracker.config.get_acrcloud_host", return_value="host")
+@patch("tracker.config.acrcloud_is_configured", return_value=True)
+@patch("tracker.get_running_game")
 @patch("tracker.capture_audio")
 def test_manual_fingerprint_audio_capture_failure(
     mock_capture, mock_game, mock_is_configured, mock_host, running_tracker
@@ -243,3 +281,17 @@ def test_manual_fingerprint_thread_safety(tracker):
 def test_is_running_returns_bool_when_stopped(tracker):
     assert tracker.is_running is False
     assert isinstance(tracker.is_running, bool)
+
+
+def test_emit_duplicate_track_once_per_same_track(tracker):
+    track = {"source": "smtc", "title": "Song", "source_app": "spotify.exe"}
+
+    tracker._emit_duplicate_track_once(track, game=None)
+    tracker._emit_duplicate_track_once(track, game=None)
+
+    events = []
+    while not tracker.event_queue.empty():
+        events.append(tracker.event_queue.get())
+
+    duplicate_events = [e for e in events if e[0] == "delivery" and "duplicate track" in e[1]]
+    assert len(duplicate_events) == 1
