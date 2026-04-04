@@ -27,7 +27,8 @@ class MainWindow:
     """
     Tkinter window showing current track and recent history.
     Designed to be shown/hidden rather than destroyed.
-    Thread-safe: call update_track() and log_status() from any thread.
+    Thread-safe: call update_track(), log_status(), and
+    set_delivery_status() from any thread.
     """
 
     def __init__(self, on_quit, on_show_settings=None, on_fingerprint_now=None):

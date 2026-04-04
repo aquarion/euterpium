@@ -45,7 +45,9 @@ async def get_smtc_track(ignored_apps: list[str] | None = None) -> dict | None:
     or None if nothing is playing / winsdk is unavailable.
 
     ignored_apps: list of lowercase substrings — any session whose
-    source_app_user_model_id contains one of these is skipped.
+    source_app_user_model_id contains one of these is returned with
+    ``excluded=True`` metadata so callers can emit debug/delivery state
+    without treating it as a playable now-playing track.
     """
     if not WINSDK_AVAILABLE:
         return None
