@@ -295,3 +295,18 @@ def test_emit_duplicate_track_once_per_same_track(tracker):
 
     duplicate_events = [e for e in events if e[0] == "delivery" and "duplicate track" in e[1]]
     assert len(duplicate_events) == 1
+
+
+@patch("tracker.config.api_is_configured", return_value=False)
+@patch("tracker.post_now_playing")
+def test_post_now_playing_with_status_not_configured_emits_warn(
+    mock_post, mock_api_configured, tracker
+):
+    tracker._post_now_playing_with_status({"source": "smtc", "title": "Song"}, game=None)
+
+    events = []
+    while not tracker.event_queue.empty():
+        events.append(tracker.event_queue.get())
+
+    assert any(e[0] == "delivery" and "not configured" in e[1] and e[2] == "warn" for e in events)
+    mock_post.assert_not_called()
