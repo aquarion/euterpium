@@ -121,7 +121,7 @@ class TrayIcon:
         if self._current_version:
             items.extend(
                 [
-                    pystray.MenuItem(f"Euterpium v{self._current_version}", None, enabled=False),
+                    pystray.MenuItem(f"Euterpium {self._current_version}", None, enabled=False),
                 ]
             )
 

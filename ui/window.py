@@ -207,7 +207,7 @@ class MainWindow:
         if self._current_version:
             self._lbl_version = tk.Label(
                 controls_row,
-                text=f"v{self._current_version}",
+                text=f"{self._current_version}",
                 font=("Segoe UI", 9),
                 bg=BG_CARD,
                 fg=TEXT_DIM,

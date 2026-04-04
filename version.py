@@ -44,7 +44,8 @@ def _compute_display_version(version_str: str) -> str:
 
 
 DEV_VERSION = "0.1.0"
-__version__ = DEV_VERSION
+# This is a number so that the replacement in the workflow works.
+__version__ = "0.1.0"
 
 # In release builds, the workflow replaces __version__ with the actual version
 # For development builds, show the git branch or "dev"
