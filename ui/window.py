@@ -31,10 +31,17 @@ class MainWindow:
     set_delivery_status() from any thread.
     """
 
-    def __init__(self, on_quit, on_show_settings=None, on_fingerprint_now=None):
+    def __init__(
+        self,
+        on_quit,
+        on_show_settings=None,
+        on_fingerprint_now=None,
+        current_version: str = "",
+    ):
         self.on_quit = on_quit
         self.on_show_settings = on_show_settings
         self.on_fingerprint_now = on_fingerprint_now
+        self._current_version = current_version
         self._root: tk.Tk | None = None
         self._visible = False
         self._queue: queue.Queue = queue.Queue()
@@ -190,6 +197,16 @@ class MainWindow:
             status_bar, text="Running", font=("Segoe UI", 9), bg=BG_CARD, fg=TEXT_GREEN
         )
         self._lbl_status.pack(side="left", padx=12)
+
+        if self._current_version:
+            self._lbl_version = tk.Label(
+                status_bar,
+                text=f"v{self._current_version}",
+                font=("Segoe UI", 9),
+                bg=BG_CARD,
+                fg=TEXT_DIM,
+            )
+            self._lbl_version.pack(side="right", padx=(4, 12))
 
         tk.Button(
             status_bar,

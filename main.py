@@ -56,7 +56,10 @@ def main():
         update_manager.install_available_update()
 
     window = MainWindow(
-        on_quit=on_quit, on_show_settings=on_show_settings, on_fingerprint_now=on_fingerprint_now
+        on_quit=on_quit,
+        on_show_settings=on_show_settings,
+        on_fingerprint_now=on_fingerprint_now,
+        current_version=__version__,
     )
     tray = TrayIcon(
         on_show_window=lambda: window.show(),
