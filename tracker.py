@@ -99,21 +99,8 @@ class Tracker:
                 track = get_smtc_track_sync(ignored_apps=config.get_smtc_ignored_apps())
                 if track:
                     if track.get("excluded"):
-                        source_name = (
-                            track.get("source_app_name") or track.get("source_app") or "unknown"
-                        )
-                        artist = track.get("artist", "")
-                        title = track.get("title", "")
-                        if artist or title:
-                            self._emit(
-                                "status",
-                                f"Ignored source ({source_name}): {artist} — {title}".strip(" —"),
-                            )
-                        else:
-                            self._emit("status", f"Ignored source ({source_name})")
-                        self._emit(
-                            "delivery", f"Webhook skipped (excluded source: {source_name})", "warn"
-                        )
+                        if self._try_set_last_track(track, game=None):
+                            self._emit_excluded_smtc(track)
                     elif self._try_set_last_track(track, game=None):
                         posted = post_now_playing(track)
                         self._emit("track", track, None)
@@ -170,6 +157,19 @@ class Tracker:
     def _emit(self, event_type: str, *args):
         self.event_queue.put((event_type, *args))
 
+    def _emit_excluded_smtc(self, track: dict):
+        source_name = track.get("source_app_name") or track.get("source_app") or "unknown"
+        artist = track.get("artist", "")
+        title = track.get("title", "")
+        if artist or title:
+            self._emit(
+                "status",
+                f"Ignored source ({source_name}): {artist} — {title}".strip(" —"),
+            )
+        else:
+            self._emit("status", f"Ignored source ({source_name})")
+        self._emit("delivery", f"Webhook skipped (excluded source: {source_name})", "warn")
+
     def _try_set_last_track(self, track: dict, game: dict | None = None) -> bool:
         """Atomically update last_track if the new track is meaningfully different."""
         track_state = dict(track)
@@ -193,6 +193,12 @@ class Tracker:
         # Compare sources - different sources means different tracks
         if a.get("source") != b.get("source"):
             return False
+
+        # For SMTC tracks, source app identity matters for deduping excluded
+        # or app-specific tracks with matching titles.
+        if a.get("source") == "smtc":
+            if (a.get("source_app") or "").lower() != (b.get("source_app") or "").lower():
+                return False
 
         # Compare games - same title from different games is different
         a_game = a.get("_game")
@@ -275,21 +281,8 @@ class Tracker:
                 else:
                     track = get_smtc_track_sync(ignored_apps=config.get_smtc_ignored_apps())
                     if track and track.get("excluded"):
-                        source_name = (
-                            track.get("source_app_name") or track.get("source_app") or "unknown"
-                        )
-                        artist = track.get("artist", "")
-                        title = track.get("title", "")
-                        if artist or title:
-                            self._emit(
-                                "status",
-                                f"Ignored source ({source_name}): {artist} — {title}".strip(" —"),
-                            )
-                        else:
-                            self._emit("status", f"Ignored source ({source_name})")
-                        self._emit(
-                            "delivery", f"Webhook skipped (excluded source: {source_name})", "warn"
-                        )
+                        if self._try_set_last_track(track, game=None):
+                            self._emit_excluded_smtc(track)
                     elif track and self._try_set_last_track(track, game=None):
                         posted = post_now_playing(track)
                         self._emit("track", track, None)

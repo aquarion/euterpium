@@ -103,9 +103,15 @@ def main():
 
             elif kind == "delivery":
                 _, message, level = msg
-                window.log_status(message, level="info")
+                window_level = "info" if level == "success" else level
+                window.log_status(message, level=window_level)
                 window.set_delivery_status(message, level)
-                logger.info(message)
+                if level == "error":
+                    logger.error(message)
+                elif level == "warn":
+                    logger.warning(message)
+                else:
+                    logger.info(message)
 
             elif kind == "error":
                 _, message = msg

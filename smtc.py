@@ -4,6 +4,7 @@
 
 import asyncio
 import logging
+import re
 import sys
 
 logger = logging.getLogger(__name__)
@@ -29,11 +30,9 @@ def _source_app_name(app_id: str) -> str:
         return "unknown"
 
     lowered = raw.lower()
-    if ".exe" in lowered:
-        parts = lowered.replace("!", ".").split(".")
-        for part in reversed(parts):
-            if part.endswith("exe"):
-                return part
+    exe_match = re.search(r"([a-z0-9_-]+\.exe)", lowered)
+    if exe_match:
+        return exe_match.group(1)
 
     cleaned = lowered.replace("!", ".")
     parts = [p for p in cleaned.split(".") if p]
