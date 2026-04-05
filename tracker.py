@@ -103,14 +103,8 @@ class Tracker:
                         if self._try_set_last_track(track, game=None):
                             self._emit_excluded_smtc(track)
                     elif self._try_set_last_track(track, game=None):
-                        posted = post_now_playing(track)
                         self._emit("track", track, None)
-                        if posted:
-                            self._emit("delivery", "Webhook sent", "success")
-                        elif config.api_is_configured():
-                            self._emit("delivery", "Webhook failed", "error")
-                        else:
-                            self._emit("delivery", "Webhook skipped (not configured)", "warn")
+                        self._post_now_playing_with_status(track, game=None)
                     else:
                         self._emit("status", "Same track detected — no change")
                         self._emit_duplicate_track_once(track, game=None)
@@ -131,14 +125,8 @@ class Tracker:
 
             if track:
                 if self._try_set_last_track(track, game=game):
-                    posted = post_now_playing(track, game=game)
                     self._emit("track", track, game)
-                    if posted:
-                        self._emit("delivery", "Webhook sent", "success")
-                    elif config.api_is_configured():
-                        self._emit("delivery", "Webhook failed", "error")
-                    else:
-                        self._emit("delivery", "Webhook skipped (not configured)", "warn")
+                    self._post_now_playing_with_status(track, game=game)
                     self._emit(
                         "status",
                         f"Identified: {track.get('artist', '?')} - {track.get('title', '?')}",
@@ -176,17 +164,28 @@ class Tracker:
 
     def _emit_duplicate_track_once(self, track: dict, game: dict | None = None):
         duplicate_key = self._track_key(track, game=game)
-
-        # Thread-safe access to duplicate tracking state
         should_emit = False
+
         with self._last_track_lock:
-            if duplicate_key == self._last_duplicate_track_key:
-                return
-            self._last_duplicate_track_key = duplicate_key
-            should_emit = True
+            if duplicate_key != self._last_duplicate_track_key:
+                self._last_duplicate_track_key = duplicate_key
+                should_emit = True
 
         if should_emit:
             self._emit("delivery", "Webhook skipped (duplicate track)", "warn")
+
+    def _post_now_playing_with_status(self, track: dict, game: dict | None = None):
+        if not config.api_is_configured():
+            self._emit("delivery", "Webhook skipped (not configured)", "warn")
+            return
+
+        posted = post_now_playing(track, game=game)
+        if posted:
+            self._emit("delivery", "Webhook sent", "success")
+        elif not config.api_is_configured():
+            self._emit("delivery", "Webhook skipped (not configured)", "warn")
+        else:
+            self._emit("delivery", "Webhook failed", "error")
 
     def _emit_excluded_smtc(self, track: dict):
         source_name = track.get("source_app_name") or track.get("source_app") or "unknown"
@@ -289,34 +288,29 @@ class Tracker:
                                 wav = audio_to_wav_bytes(audio)
                                 track = identify_audio(wav)
 
-                            if track and self._try_set_last_track(track, game=game):
-                                posted = post_now_playing(track, game=game)
-                                self._emit("track", track, game)
-                                if posted:
-                                    self._emit("delivery", "Webhook sent", "success")
-                                elif config.api_is_configured():
-                                    self._emit("delivery", "Webhook failed", "error")
+                                if track:
+                                    if self._try_set_last_track(track, game=game):
+                                        self._emit("track", track, game)
+                                        self._post_now_playing_with_status(track, game=game)
+                                    else:
+                                        self._emit_duplicate_track_once(track, game=game)
                                 else:
-                                    self._emit("delivery", "Webhook skipped (not configured)", "warn")
-                            elif track:
-                                self._emit_duplicate_track_once(track, game=game)
-                            else:
-                                self._emit(
-                                    "status", f"No match found in {game['display_name']}"
-                                )
-                                with self._last_track_lock:
-                                    current_track = self.last_track
-                                if not (current_track and current_track.get("_game") == game):
-                                    fallback = {
-                                        "source": "game_only",
-                                        "title": "",
-                                        "artist": "",
-                                        "_game": game,
-                                    }
-                                    # Don't post_now_playing for unidentified tracks
+                                    self._emit(
+                                        "status", f"No match found in {game['display_name']}"
+                                    )
                                     with self._last_track_lock:
-                                        self.last_track = fallback
-                                    self._emit("track", fallback, game)
+                                        current_track = self.last_track
+                                    if not (current_track and current_track.get("_game") == game):
+                                        fallback = {
+                                            "source": "game_only",
+                                            "title": "",
+                                            "artist": "",
+                                            "_game": game,
+                                        }
+                                        # Don't post_now_playing for unidentified tracks
+                                        with self._last_track_lock:
+                                            self.last_track = fallback
+                                        self._emit("track", fallback, game)
                         finally:
                             self._fingerprint_lock.release()
                 else:
@@ -325,14 +319,8 @@ class Tracker:
                         if self._try_set_last_track(track, game=None):
                             self._emit_excluded_smtc(track)
                     elif track and self._try_set_last_track(track, game=None):
-                        posted = post_now_playing(track)
                         self._emit("track", track, None)
-                        if posted:
-                            self._emit("delivery", "Webhook sent", "success")
-                        elif config.api_is_configured():
-                            self._emit("delivery", "Webhook failed", "error")
-                        else:
-                            self._emit("delivery", "Webhook skipped (not configured)", "warn")
+                        self._post_now_playing_with_status(track, game=None)
                     elif track:
                         self._emit_duplicate_track_once(track, game=None)
                     elif not track:
