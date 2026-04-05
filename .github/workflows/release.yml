@@ -66,6 +66,7 @@ jobs:
           echo "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
 
       - name: Test after version replacement
+        if: github.event_name == 'push'
         run: poetry run pytest --tb=short -q
         shell: pwsh
 
@@ -87,6 +88,7 @@ jobs:
           echo "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
 
       - name: Test after version replacement
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
         run: poetry run pytest --tb=short -q
         shell: pwsh
 
