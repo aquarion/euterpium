@@ -1,6 +1,8 @@
 import importlib
 import subprocess
 
+import pytest
+
 import version
 
 
@@ -65,6 +67,10 @@ def test_display_version_dev_fallback_when_git_unavailable(monkeypatch):
     assert result == "dev"
 
 
+@pytest.mark.skipif(
+    version.__version__ != version.DEV_VERSION,
+    reason="Module-reload dev-build tests are only valid before version substitution",
+)
 def test_display_version_uses_branch_name_in_dev_build(monkeypatch):
     """When __version__ is default, detect git branch for display version."""
 
@@ -74,10 +80,14 @@ def test_display_version_uses_branch_name_in_dev_build(monkeypatch):
     monkeypatch.setattr(version.subprocess, "run", fake_run)
 
     reloaded = importlib.reload(version)
-    assert reloaded.__version__ == "0.1.0"
+    assert reloaded.__version__ == version.DEV_VERSION
     assert reloaded.__display_version__ == "feature/my-branch"
 
 
+@pytest.mark.skipif(
+    version.__version__ != version.DEV_VERSION,
+    reason="Module-reload dev-build tests are only valid before version substitution",
+)
 def test_display_version_defaults_to_dev_when_git_unavailable(monkeypatch):
     """When __version__ is default and git fails, fall back to 'dev'."""
 
@@ -87,5 +97,5 @@ def test_display_version_defaults_to_dev_when_git_unavailable(monkeypatch):
     monkeypatch.setattr(version.subprocess, "run", fake_run)
 
     reloaded = importlib.reload(version)
-    assert reloaded.__version__ == "0.1.0"
+    assert reloaded.__version__ == version.DEV_VERSION
     assert reloaded.__display_version__ == "dev"
