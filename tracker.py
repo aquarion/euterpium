@@ -182,6 +182,8 @@ class Tracker:
         posted = post_now_playing(track, game=game)
         if posted:
             self._emit("delivery", "Webhook sent", "success")
+        elif not config.api_is_configured():
+            self._emit("delivery", "Webhook skipped (not configured)", "warn")
         else:
             self._emit("delivery", "Webhook failed", "error")
 
