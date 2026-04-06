@@ -40,7 +40,7 @@ jobs:
             echo "dependabot-updates is identical to main, skipping PR creation"
             exit 0
           fi
-          if ! gh pr list --head dependabot-updates --state open --json number | grep -q number; then
+          if [ "$(gh pr list --head "${{ github.repository_owner }}:dependabot-updates" --state open --json number --jq 'length')" = "0" ]; then
             gh pr create \
               --base main \
               --head dependabot-updates \
