@@ -36,7 +36,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh pr view dependabot-updates --json number 2>/dev/null; then
+          if git diff --quiet origin/main dependabot-updates; then
+            echo "dependabot-updates is identical to main, skipping PR creation"
+            exit 0
+          fi
+          if [ "$(gh pr list --head "${{ github.repository_owner }}:dependabot-updates" --state open --json number --jq 'length')" = "0" ]; then
             gh pr create \
               --base main \
               --head dependabot-updates \
