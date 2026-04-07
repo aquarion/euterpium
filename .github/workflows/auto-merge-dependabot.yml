@@ -2,21 +2,15 @@ name: "[Auto] Merge Dependabot Updates"
 
 on:
   workflow_run:
-    workflows: ["Laravel Unit Tests"]
+    workflows: ["[Tests] Acceptance Testing"]
     types:
       - completed
     branches-ignore:
       - 'main'
+
 jobs:
   automerge:
-    runs-on: ubuntu-latest
-
+    uses: istic/shared-workflows/.github/workflows/auto-merge-dependabot.yml@main
     permissions:
       pull-requests: write
       contents: write
-
-    steps:
-      - uses: fastify/github-action-merge-dependabot@v3
-        with:
-          merge-method: squash
-          use-github-auto-merge: true
