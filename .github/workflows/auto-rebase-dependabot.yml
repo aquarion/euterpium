@@ -7,44 +7,7 @@ on:
 
 jobs:
   rebase:
-    runs-on: ubuntu-latest
+    uses: istic/shared-workflows/.github/workflows/auto-rebase-dependabot.yml@main
     permissions:
       contents: write
       pull-requests: write
-
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Configure git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Rebase dependabot-updates onto main
-        run: |
-          if git ls-remote --exit-code origin dependabot-updates; then
-            git checkout dependabot-updates
-            git rebase origin/main
-          else
-            git checkout -b dependabot-updates origin/main
-          fi
-          git push origin dependabot-updates --force-with-lease
-
-      - name: Open PR if one doesn't exist
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if git diff --quiet origin/main dependabot-updates; then
-            echo "dependabot-updates is identical to main, skipping PR creation"
-            exit 0
-          fi
-          if [ "$(gh pr list --head "${{ github.repository_owner }}:dependabot-updates" --state open --json number --jq 'length')" = "0" ]; then
-            gh pr create \
-              --base main \
-              --head dependabot-updates \
-              --title "🛡️ dependabot updates" \
-              --body "Aggregated dependabot dependency updates." \
-              --draft
-          fi
