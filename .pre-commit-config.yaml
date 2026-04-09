@@ -24,3 +24,12 @@ repos:
       - id: ruff-check
         args: [--fix]
       - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: dotnet-format
+        name: dotnet format
+        entry: dotnet format playnite-plugin/EuterpiumExporter.csproj --verify-no-changes
+        language: system
+        files: ^playnite-plugin/.*\.(cs|csproj)$
+        pass_filenames: false
