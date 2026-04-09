@@ -37,19 +37,7 @@ namespace EuterpiumExporter
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
             // Clear any stale file left by a previous crash
-            if (File.Exists(_currentGamePath))
-            {
-                try
-                {
-                    File.Delete(_currentGamePath);
-                    logger.Info("EuterpiumExporter: cleared stale current game file on startup");
-                }
-                catch (Exception ex)
-                {
-                    logger.Warn($"EuterpiumExporter: failed to clear stale current game file '{_currentGamePath}': {ex.Message}");
-                }
-            }
-
+            TryDeleteCurrentGameFile("startup");
             logger.Info("EuterpiumExporter: ready");
         }
 
@@ -130,12 +118,27 @@ namespace EuterpiumExporter
                 throw;
             }
         }
+
         public override void OnGameStopped(OnGameStoppedEventArgs args)
         {
-            if (File.Exists(_currentGamePath))
-                File.Delete(_currentGamePath);
-
+            TryDeleteCurrentGameFile($"game stopped — {args.Game.Name}");
             logger.Info($"EuterpiumExporter: game stopped — {args.Game.Name}");
+        }
+
+        private void TryDeleteCurrentGameFile(string context)
+        {
+            if (!File.Exists(_currentGamePath))
+                return;
+
+            try
+            {
+                File.Delete(_currentGamePath);
+                logger.Info($"EuterpiumExporter: current game file deleted ({context})");
+            }
+            catch (Exception ex)
+            {
+                logger.Warn($"EuterpiumExporter: failed to delete current game file ({context}): {ex.Message}");
+            }
         }
 
         // Fallback exe resolution when Playnite doesn't provide a process ID.
