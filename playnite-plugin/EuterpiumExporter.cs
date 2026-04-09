@@ -60,7 +60,13 @@ namespace EuterpiumExporter
                 }
 
                 var json = JsonConvert.SerializeObject(entries, Formatting.Indented);
-                File.WriteAllText(_exportPath, json);
+                var dir = Path.GetDirectoryName(_exportPath);
+                var tmp = Path.Combine(dir, Path.GetRandomFileName());
+                File.WriteAllText(tmp, json);
+                if (File.Exists(_exportPath))
+                    File.Replace(tmp, _exportPath, null);
+                else
+                    File.Move(tmp, _exportPath);
                 logger.Info($"EuterpiumExporter: exported {entries.Count} game(s) to {_exportPath}");
             }
             catch (Exception ex)

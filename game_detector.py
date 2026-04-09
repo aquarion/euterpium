@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 
 import psutil
 
@@ -10,13 +11,26 @@ from config import KNOWN_GAMES
 
 logger = logging.getLogger(__name__)
 
+# Playnite JSON cache: (mtime, parsed_dict)
+_playnite_cache: tuple[float, dict[str, str]] | None = None
+
 
 def _load_playnite_games() -> dict[str, str]:
     """
     Reads the Playnite-exported JSON and returns {process_lower: display_name}.
+    Result is cached and only reloaded when the file's mtime changes.
     Returns {} silently if the file is missing or malformed.
     """
+    global _playnite_cache
     path = config.get_playnite_games_path()
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        return {}
+
+    if _playnite_cache is not None and _playnite_cache[0] == mtime:
+        return _playnite_cache[1]
+
     try:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
@@ -26,9 +40,8 @@ def _load_playnite_games() -> dict[str, str]:
             if "process" in entry and "name" in entry
         }
         logger.debug("Loaded %d game(s) from Playnite (%s)", len(games), path)
+        _playnite_cache = (mtime, games)
         return games
-    except FileNotFoundError:
-        return {}
     except Exception as e:
         logger.debug("Could not load Playnite games from %s: %s", path, e)
         return {}
