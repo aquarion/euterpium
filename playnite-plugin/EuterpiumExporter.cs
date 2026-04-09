@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using Newtonsoft.Json;
 using Playnite.SDK;
 using Playnite.SDK.Events;
@@ -47,16 +48,17 @@ namespace EuterpiumExporter
             string exeName = null;
 
             // Prefer the actual process name from the PID Playnite gives us
-            if (args.StartedProcessId.HasValue)
+            var pid = args.StartedProcessId;
+            if (pid > 0)
             {
                 try
                 {
-                    var proc = Process.GetProcessById(args.StartedProcessId.Value);
+                    var proc = Process.GetProcessById((int)pid);
                     exeName = proc.MainModule?.ModuleName;
                 }
                 catch (Exception ex)
                 {
-                    logger.Warn($"EuterpiumExporter: could not get process name from PID {args.StartedProcessId}: {ex.Message}");
+                    logger.Warn($"EuterpiumExporter: could not get process name from PID {pid}: {ex.Message}");
                 }
             }
 
