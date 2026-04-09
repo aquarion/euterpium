@@ -133,6 +133,12 @@ When a known game process is running, a `game` object is added regardless of sou
 
 If an API key is set in the active profile, requests include an `Authorization: Bearer <key>` header.
 
+## Playnite integration
+
+Euterpium includes a Playnite generic plugin that automatically exports your game library so `game_detector.py` can identify running games without any manual `[games]` configuration.
+
+See [docs/playnite-plugin.md](docs/playnite-plugin.md) for build, install, and auto-update instructions.
+
 ## Tools / utilities
 
 `smtc_debug.py` — dumps all SMTC sessions and their metadata. Useful for diagnosing detection issues:
