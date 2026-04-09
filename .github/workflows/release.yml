@@ -164,6 +164,34 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Update addon installer manifest
+        shell: pwsh
+        run: |
+          $version = $env:APP_VERSION
+          $versionUnderscored = $version -replace '\.', '_'
+          $pextName = "EuterpiumExporter_a1b2c3d4-e5f6-7890-abcd-ef1234567890_${versionUnderscored}.pext"
+          $pextUrl = "https://github.com/aquarion/euterpium/releases/download/$env:RELEASE_TAG/$pextName"
+          $releaseDate = (Get-Date -Format "yyyy-MM-dd")
+
+          try {
+            $current = (Invoke-WebRequest -Uri "https://raw.githubusercontent.com/aquarion/euterpium/gh-pages/InstallerManifest.yaml" -UseBasicParsing).Content
+          } catch {
+            $current = "AddonId: EuterpiumExporter_a1b2c3d4-e5f6-7890-abcd-ef1234567890`nPackages:`n"
+          }
+
+          $newEntry = "  - Version: $version`n    RequiredApiVersion: 6.0.0`n    ReleaseDate: $releaseDate`n    PackageUrl: $pextUrl`n    Changelog:`n      - See https://github.com/aquarion/euterpium/releases/tag/$env:RELEASE_TAG`n"
+          $updated = $current -replace '(Packages:\r?\n)', "`$1$newEntry"
+
+          New-Item -ItemType Directory -Force -Path gh-pages-out | Out-Null
+          Set-Content gh-pages-out\InstallerManifest.yaml $updated -NoNewline
+
+      - name: Deploy manifest to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./gh-pages-out
+          keep_files: true
+
       - name: Clean up artifacts
         run: |
           Remove-Item ${{ env.ZIP_NAME }}
