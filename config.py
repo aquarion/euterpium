@@ -222,12 +222,12 @@ def get_known_games() -> dict[str, str]:
     return dict(cfg.items("games"))
 
 
-def get_playnite_games_path() -> str:
-    """Returns the path to the Playnite-exported games JSON file."""
-    raw = _cfg().get("playnite", "games_file", fallback="").strip()
+def get_playnite_current_game_path() -> str:
+    """Returns the path to the file the Playnite plugin writes when a game is running."""
+    raw = _cfg().get("playnite", "current_game_file", fallback="").strip()
     if raw:
         return raw
-    return os.path.join(os.environ.get("APPDATA", ""), "Playnite", "euterpium_games.json")
+    return os.path.join(os.environ.get("APPDATA", ""), "Playnite", "euterpium_current_game.json")
 
 
 # ── SMTC ──────────────────────────────────────────────────────────────────────

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using Newtonsoft.Json;
 using Playnite.SDK;
 using Playnite.SDK.Events;
@@ -13,10 +15,19 @@ namespace EuterpiumExporter
     {
         private static readonly ILogger logger = LogManager.GetLogger();
 
-        private readonly string _exportPath = Path.Combine(
+        // Exe name substrings (lowercase) that are never the main game executable,
+        // used as a fallback when Playnite doesn't provide a process ID.
+        private static readonly string[] _nonGameExePatterns = new[]
+        {
+            "unins", "setup", "install", "redist", "vcredist", "dxsetup",
+            "dotnet", "crash", "report", "helper", "launcher_fixes",
+            "steam_", "easyanticheat", "battleye", "be_service",
+        };
+
+        private readonly string _currentGamePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "Playnite",
-            "euterpium_games.json"
+            "euterpium_current_game.json"
         );
 
         public override Guid Id { get; } = Guid.Parse("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
@@ -25,63 +36,142 @@ namespace EuterpiumExporter
 
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
-            ExportGames();
-            PlayniteApi.Database.Games.ItemCollectionChanged += (_, __) => ExportGames();
-            PlayniteApi.Database.Games.ItemUpdated += (_, __) => ExportGames();
+            // Clear any stale file left by a previous crash
+            if (File.Exists(_currentGamePath))
+            {
+                File.Delete(_currentGamePath);
+                logger.Info("EuterpiumExporter: cleared stale current game file on startup");
+            }
+
+            logger.Info("EuterpiumExporter: ready");
         }
 
-        private void ExportGames()
+        public override void OnGameStarted(OnGameStartedEventArgs args)
         {
-            try
-            {
-                var entries = new List<GameEntry>();
+            var game = args.Game;
+            string exeName = null;
 
-                foreach (var game in PlayniteApi.Database.Games)
+            // Prefer the actual process name from the PID Playnite gives us
+            if (args.StartedProcessId.HasValue)
+            {
+                try
                 {
-                    if (game.GameActions == null)
+                    var proc = Process.GetProcessById(args.StartedProcessId.Value);
+                    exeName = proc.MainModule?.ModuleName;
+                }
+                catch (Exception ex)
+                {
+                    logger.Warn($"EuterpiumExporter: could not get process name from PID {args.StartedProcessId}: {ex.Message}");
+                }
+            }
+
+            // Fall back to resolving from game configuration / install directory
+            if (string.IsNullOrWhiteSpace(exeName))
+                exeName = FindGameExe(game);
+
+            if (string.IsNullOrWhiteSpace(exeName))
+            {
+                logger.Warn($"EuterpiumExporter: could not determine exe for '{game.Name}' — game will not be detected");
+                return;
+            }
+
+            var entry = new CurrentGameEntry
+            {
+                Process = exeName,
+                Name = game.Name,
+                Pid = args.StartedProcessId,
+            };
+
+            File.WriteAllText(_currentGamePath, JsonConvert.SerializeObject(entry, Formatting.Indented));
+            logger.Info($"EuterpiumExporter: game started — {game.Name} ({exeName})");
+        }
+
+        public override void OnGameStopped(OnGameStoppedEventArgs args)
+        {
+            if (File.Exists(_currentGamePath))
+                File.Delete(_currentGamePath);
+
+            logger.Info($"EuterpiumExporter: game stopped — {args.Game.Name}");
+        }
+
+        // Fallback exe resolution when Playnite doesn't provide a process ID.
+        // Tries explicit File-type play actions first, then scans the install directory.
+        private string FindGameExe(Game game)
+        {
+            if (game.GameActions != null)
+            {
+                foreach (var action in game.GameActions)
+                {
+                    if (!action.IsPlayAction || action.Type != GameActionType.File)
                         continue;
 
-                    foreach (var action in game.GameActions)
-                    {
-                        if (!action.IsPlayAction || action.Type != GameActionType.File)
-                            continue;
+                    var resolved = PlayniteApi.ExpandGameVariables(game, action.Path);
+                    if (string.IsNullOrWhiteSpace(resolved))
+                        continue;
 
-                        var resolvedPath = PlayniteApi.ExpandGameVariables(game, action.Path);
-                        if (string.IsNullOrWhiteSpace(resolvedPath))
-                            continue;
-
-                        var exe = Path.GetFileName(resolvedPath);
-                        if (string.IsNullOrWhiteSpace(exe))
-                            continue;
-
-                        entries.Add(new GameEntry { Process = exe, Name = game.Name });
-                        break; // one entry per game
-                    }
+                    var exe = Path.GetFileName(resolved);
+                    if (!string.IsNullOrWhiteSpace(exe))
+                        return exe;
                 }
+            }
 
-                var json = JsonConvert.SerializeObject(entries, Formatting.Indented);
-                var dir = Path.GetDirectoryName(_exportPath);
-                var tmp = Path.Combine(dir, Path.GetRandomFileName());
-                File.WriteAllText(tmp, json);
-                if (File.Exists(_exportPath))
-                    File.Replace(tmp, _exportPath, null);
-                else
-                    File.Move(tmp, _exportPath);
-                logger.Info($"EuterpiumExporter: exported {entries.Count} game(s) to {_exportPath}");
+            if (string.IsNullOrWhiteSpace(game.InstallDirectory) ||
+                !Directory.Exists(game.InstallDirectory))
+                return null;
+
+            try
+            {
+                var candidates = Directory
+                    .GetFiles(game.InstallDirectory, "*.exe", SearchOption.TopDirectoryOnly)
+                    .Select(Path.GetFileName)
+                    .Where(f => !IsNonGameExe(f))
+                    .ToList();
+
+                if (candidates.Count == 1)
+                    return candidates[0];
+
+                if (candidates.Count > 1)
+                {
+                    var slug = new string(game.Name
+                        .ToLowerInvariant()
+                        .Where(char.IsLetterOrDigit)
+                        .ToArray());
+
+                    return candidates.FirstOrDefault(f =>
+                    {
+                        var nameSlug = new string(
+                            Path.GetFileNameWithoutExtension(f)
+                                .ToLowerInvariant()
+                                .Where(char.IsLetterOrDigit)
+                                .ToArray());
+                        return nameSlug.Contains(slug) || slug.Contains(nameSlug);
+                    });
+                }
             }
             catch (Exception ex)
             {
-                logger.Error(ex, "EuterpiumExporter: failed to export games");
+                logger.Warn($"EuterpiumExporter: could not scan install dir for '{game.Name}': {ex.Message}");
             }
+
+            return null;
+        }
+
+        private static bool IsNonGameExe(string filename)
+        {
+            var lower = filename.ToLowerInvariant();
+            return _nonGameExePatterns.Any(p => lower.Contains(p));
         }
     }
 
-    internal class GameEntry
+    internal class CurrentGameEntry
     {
         [JsonProperty("process")]
         public string Process { get; set; }
 
         [JsonProperty("name")]
         public string Name { get; set; }
+
+        [JsonProperty("pid")]
+        public int? Pid { get; set; }
     }
 }
