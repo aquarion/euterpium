@@ -82,10 +82,47 @@ namespace EuterpiumExporter
                 Pid = args.StartedProcessId,
             };
 
-            File.WriteAllText(_currentGamePath, JsonConvert.SerializeObject(entry, Formatting.Indented));
+            var currentGameJson = JsonConvert.SerializeObject(entry, Formatting.Indented);
+            WriteCurrentGameFileAtomically(currentGameJson);
             logger.Info($"EuterpiumExporter: game started — {game.Name} ({exeName})");
         }
 
+        private void WriteCurrentGameFileAtomically(string contents)
+        {
+            var directory = Path.GetDirectoryName(_currentGamePath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            var tempPath = Path.Combine(
+                directory ?? string.Empty,
+                Path.GetFileName(_currentGamePath) + "." + Guid.NewGuid().ToString("N") + ".tmp"
+            );
+
+            try
+            {
+                File.WriteAllText(tempPath, contents);
+
+                if (File.Exists(_currentGamePath))
+                {
+                    File.Replace(tempPath, _currentGamePath, null);
+                }
+                else
+                {
+                    File.Move(tempPath, _currentGamePath);
+                }
+            }
+            catch
+            {
+                if (File.Exists(tempPath))
+                {
+                    File.Delete(tempPath);
+                }
+
+                throw;
+            }
+        }
         public override void OnGameStopped(OnGameStoppedEventArgs args)
         {
             if (File.Exists(_currentGamePath))
