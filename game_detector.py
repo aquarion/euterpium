@@ -2,7 +2,6 @@
 
 import json
 import logging
-import os
 
 import psutil
 
@@ -11,62 +10,65 @@ from config import KNOWN_GAMES
 
 logger = logging.getLogger(__name__)
 
-# Playnite JSON cache: (mtime, parsed_dict)
-_playnite_cache: tuple[float, dict[str, str]] | None = None
+_current_game_logged_missing = False
 
 
-def _load_playnite_games() -> dict[str, str]:
+def _get_playnite_current_game() -> dict | None:
     """
-    Reads the Playnite-exported JSON and returns {process_lower: display_name}.
-    Result is cached and only reloaded when the file's mtime changes.
-    Returns {} silently if the file is missing or malformed.
+    Reads the file the Playnite plugin writes when a game starts.
+    Validates the PID is still alive to guard against stale files.
+    Returns a game dict or None.
     """
-    global _playnite_cache
-    path = config.get_playnite_games_path()
-    try:
-        mtime = os.path.getmtime(path)
-    except OSError:
-        return {}
-
-    if _playnite_cache is not None and _playnite_cache[0] == mtime:
-        return _playnite_cache[1]
-
+    global _current_game_logged_missing
+    path = config.get_playnite_current_game_path()
     try:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
-        games = {
-            entry["process"].lower(): entry["name"]
-            for entry in data
-            if "process" in entry and "name" in entry
-        }
-        logger.debug("Loaded %d game(s) from Playnite (%s)", len(games), path)
-        _playnite_cache = (mtime, games)
-        return games
+
+        pid = data.get("pid")
+        if pid is not None and not psutil.pid_exists(pid):
+            logger.debug("Playnite current game file has stale PID %d — ignoring", pid)
+            return None
+
+        process_name = str(data["process"]).strip().lower()
+        _current_game_logged_missing = False
+        return {"process": process_name, "display_name": data["name"]}
+
+    except FileNotFoundError:
+        if not _current_game_logged_missing:
+            logger.info("Playnite current game file not found: %s", path)
+            _current_game_logged_missing = True
+        return None
     except Exception as e:
-        logger.debug("Could not load Playnite games from %s: %s", path, e)
-        return {}
+        logger.debug("Could not read Playnite current game from %s: %s", path, e)
+        return None
 
 
 def get_running_game() -> dict | None:
     """
-    Checks running processes against the known games list (manual config merged
-    with Playnite data). Manual [games] entries take precedence over Playnite.
-    Returns the first match as a dict, or None if no known game is running.
+    Returns the currently running game as a dict, or None.
+
+    Checks in order:
+    1. Playnite event-driven file (euterpium_current_game.json) — covers all
+       games launched via Playnite regardless of platform.
+    2. Manual [games] entries from euterpium.ini — covers games launched
+       outside Playnite.
     """
-    playnite_games = _load_playnite_games()
-    known_games = {**playnite_games, **KNOWN_GAMES}
+    game = _get_playnite_current_game()
+    if game:
+        return game
+
+    if not KNOWN_GAMES:
+        return None
 
     try:
         for proc in psutil.process_iter(["name"]):
             proc_name = (proc.info.get("name", "") or "").lower()
-            if proc_name in known_games:
-                return {
-                    "process": proc_name,
-                    "display_name": known_games[proc_name],
-                }
+            if proc_name in KNOWN_GAMES:
+                return {"process": proc_name, "display_name": KNOWN_GAMES[proc_name]}
     except (psutil.NoSuchProcess, psutil.AccessDenied):
         pass
     except Exception as e:
-        logger.debug(f"Process scan error: {e}")
+        logger.debug("Process scan error: %s", e)
 
     return None

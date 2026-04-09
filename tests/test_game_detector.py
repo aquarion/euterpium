@@ -1,7 +1,7 @@
 # tests/test_game_detector.py — process scanning and game matching
 
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import psutil
 
@@ -9,54 +9,125 @@ import game_detector
 
 
 def _proc(name):
+    from unittest.mock import MagicMock
+
     mock = MagicMock()
     mock.info = {"name": name}
     return mock
 
 
-# ── Basic detection ───────────────────────────────────────────────────────────
+def _current_game_file(tmp_path, process, name, pid=None):
+    """Write a current game file and return the path."""
+    data = {"process": process, "name": name}
+    if pid is not None:
+        data["pid"] = pid
+    p = tmp_path / "euterpium_current_game.json"
+    p.write_text(json.dumps(data))
+    return str(p)
 
 
-def test_returns_none_when_no_known_game_running(monkeypatch):
+# ── Playnite event-driven detection ──────────────────────────────────────────
+
+
+def test_detects_game_from_playnite_current_game_file(monkeypatch, tmp_path):
+    path = _current_game_file(tmp_path, "witcher3.exe", "The Witcher 3")
+    monkeypatch.setattr("config.get_playnite_current_game_path", lambda: path)
+    result = game_detector.get_running_game()
+    assert result == {"process": "witcher3.exe", "display_name": "The Witcher 3"}
+
+
+def test_playnite_current_game_file_missing_returns_none(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "config.get_playnite_current_game_path",
+        lambda: str(tmp_path / "nonexistent.json"),
+    )
+    monkeypatch.setattr(game_detector, "KNOWN_GAMES", {})
+    result = game_detector.get_running_game()
+    assert result is None
+
+
+def test_playnite_current_game_pid_validated_against_live_processes(monkeypatch, tmp_path):
+    path = _current_game_file(tmp_path, "game.exe", "My Game", pid=99999999)
+    monkeypatch.setattr("config.get_playnite_current_game_path", lambda: path)
+    monkeypatch.setattr(game_detector, "KNOWN_GAMES", {})
+    # PID 99999999 almost certainly doesn't exist
+    with patch("psutil.pid_exists", return_value=False):
+        result = game_detector.get_running_game()
+    assert result is None
+
+
+def test_playnite_current_game_with_valid_pid_is_returned(monkeypatch, tmp_path):
+    path = _current_game_file(tmp_path, "game.exe", "My Game", pid=1234)
+    monkeypatch.setattr("config.get_playnite_current_game_path", lambda: path)
+    with patch("psutil.pid_exists", return_value=True):
+        result = game_detector.get_running_game()
+    assert result == {"process": "game.exe", "display_name": "My Game"}
+
+
+def test_playnite_current_game_without_pid_is_trusted(monkeypatch, tmp_path):
+    path = _current_game_file(tmp_path, "game.exe", "My Game")  # no pid
+    monkeypatch.setattr("config.get_playnite_current_game_path", lambda: path)
+    result = game_detector.get_running_game()
+    assert result == {"process": "game.exe", "display_name": "My Game"}
+
+
+def test_playnite_current_game_malformed_falls_back(monkeypatch, tmp_path):
+    bad = tmp_path / "euterpium_current_game.json"
+    bad.write_text("not valid json{{")
+    monkeypatch.setattr("config.get_playnite_current_game_path", lambda: str(bad))
+    monkeypatch.setattr(game_detector, "KNOWN_GAMES", {"game.exe": "My Game"})
+    with patch("psutil.process_iter", return_value=[_proc("game.exe")]):
+        result = game_detector.get_running_game()
+    assert result == {"process": "game.exe", "display_name": "My Game"}
+
+
+# ── Manual [games] fallback ───────────────────────────────────────────────────
+
+
+def test_falls_back_to_manual_games_when_no_current_game_file(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "config.get_playnite_current_game_path",
+        lambda: str(tmp_path / "nonexistent.json"),
+    )
     monkeypatch.setattr(game_detector, "KNOWN_GAMES", {"ffxiv_dx11.exe": "Final Fantasy XIV"})
-    monkeypatch.setattr(game_detector, "_load_playnite_games", lambda: {})
-    with patch("psutil.process_iter", return_value=[_proc("notepad.exe"), _proc("chrome.exe")]):
-        assert game_detector.get_running_game() is None
-
-
-def test_detects_known_game(monkeypatch):
-    monkeypatch.setattr(game_detector, "KNOWN_GAMES", {"ffxiv_dx11.exe": "Final Fantasy XIV"})
-    monkeypatch.setattr(game_detector, "_load_playnite_games", lambda: {})
     with patch("psutil.process_iter", return_value=[_proc("ffxiv_dx11.exe")]):
         result = game_detector.get_running_game()
     assert result == {"process": "ffxiv_dx11.exe", "display_name": "Final Fantasy XIV"}
 
 
-def test_returns_first_match_when_multiple_games_running(monkeypatch):
+def test_playnite_takes_priority_over_manual_games(monkeypatch, tmp_path):
+    path = _current_game_file(tmp_path, "bg3.exe", "Baldur's Gate 3 (Playnite)")
+    monkeypatch.setattr("config.get_playnite_current_game_path", lambda: path)
+    monkeypatch.setattr(game_detector, "KNOWN_GAMES", {"bg3.exe": "Baldur's Gate 3 (Manual)"})
+    result = game_detector.get_running_game()
+    assert result["display_name"] == "Baldur's Gate 3 (Playnite)"
+
+
+def test_returns_none_when_no_known_game_running(monkeypatch, tmp_path):
     monkeypatch.setattr(
-        game_detector,
-        "KNOWN_GAMES",
-        {
-            "game_a.exe": "Game A",
-            "game_b.exe": "Game B",
-        },
+        "config.get_playnite_current_game_path",
+        lambda: str(tmp_path / "nonexistent.json"),
     )
-    monkeypatch.setattr(game_detector, "_load_playnite_games", lambda: {})
-    with patch("psutil.process_iter", return_value=[_proc("game_a.exe"), _proc("game_b.exe")]):
-        result = game_detector.get_running_game()
-    assert result["process"] == "game_a.exe"
-
-
-def test_returns_none_when_process_list_is_empty(monkeypatch):
     monkeypatch.setattr(game_detector, "KNOWN_GAMES", {"ffxiv_dx11.exe": "Final Fantasy XIV"})
-    monkeypatch.setattr(game_detector, "_load_playnite_games", lambda: {})
-    with patch("psutil.process_iter", return_value=[]):
+    with patch("psutil.process_iter", return_value=[_proc("notepad.exe")]):
         assert game_detector.get_running_game() is None
 
 
-def test_process_name_matching_is_case_insensitive(monkeypatch):
+def test_returns_none_when_no_games_configured(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "config.get_playnite_current_game_path",
+        lambda: str(tmp_path / "nonexistent.json"),
+    )
+    monkeypatch.setattr(game_detector, "KNOWN_GAMES", {})
+    assert game_detector.get_running_game() is None
+
+
+def test_manual_process_matching_is_case_insensitive(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "config.get_playnite_current_game_path",
+        lambda: str(tmp_path / "nonexistent.json"),
+    )
     monkeypatch.setattr(game_detector, "KNOWN_GAMES", {"rocketleague.exe": "Rocket League"})
-    monkeypatch.setattr(game_detector, "_load_playnite_games", lambda: {})
     with patch("psutil.process_iter", return_value=[_proc("RocketLeague.exe")]):
         result = game_detector.get_running_game()
     assert result == {"process": "rocketleague.exe", "display_name": "Rocket League"}
@@ -65,140 +136,21 @@ def test_process_name_matching_is_case_insensitive(monkeypatch):
 # ── Error resilience ──────────────────────────────────────────────────────────
 
 
-def test_handles_no_such_process_gracefully(monkeypatch):
+def test_handles_no_such_process_gracefully(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "config.get_playnite_current_game_path",
+        lambda: str(tmp_path / "nonexistent.json"),
+    )
     monkeypatch.setattr(game_detector, "KNOWN_GAMES", {"game.exe": "Game"})
-    monkeypatch.setattr(game_detector, "_load_playnite_games", lambda: {})
     with patch("psutil.process_iter", side_effect=psutil.NoSuchProcess(pid=1)):
         assert game_detector.get_running_game() is None
 
 
-def test_handles_access_denied_gracefully(monkeypatch):
+def test_handles_access_denied_gracefully(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "config.get_playnite_current_game_path",
+        lambda: str(tmp_path / "nonexistent.json"),
+    )
     monkeypatch.setattr(game_detector, "KNOWN_GAMES", {"game.exe": "Game"})
-    monkeypatch.setattr(game_detector, "_load_playnite_games", lambda: {})
     with patch("psutil.process_iter", side_effect=psutil.AccessDenied(pid=1)):
         assert game_detector.get_running_game() is None
-
-
-# ── Playnite integration ──────────────────────────────────────────────────────
-
-
-def test_detects_game_from_playnite_data(monkeypatch, tmp_path):
-    games_file = tmp_path / "euterpium_games.json"
-    games_file.write_text(json.dumps([{"process": "bg3.exe", "name": "Baldur's Gate 3"}]))
-    monkeypatch.setattr(game_detector, "KNOWN_GAMES", {})
-    monkeypatch.setattr("config.get_playnite_games_path", lambda: str(games_file))
-    with patch("psutil.process_iter", return_value=[_proc("bg3.exe")]):
-        result = game_detector.get_running_game()
-    assert result == {"process": "bg3.exe", "display_name": "Baldur's Gate 3"}
-
-
-def test_manual_games_override_playnite(monkeypatch, tmp_path):
-    games_file = tmp_path / "euterpium_games.json"
-    games_file.write_text(
-        json.dumps([{"process": "bg3.exe", "name": "Baldur's Gate 3 (Playnite)"}])
-    )
-    monkeypatch.setattr(game_detector, "KNOWN_GAMES", {"bg3.exe": "Baldur's Gate 3 (Manual)"})
-    monkeypatch.setattr("config.get_playnite_games_path", lambda: str(games_file))
-    with patch("psutil.process_iter", return_value=[_proc("bg3.exe")]):
-        result = game_detector.get_running_game()
-    assert result["display_name"] == "Baldur's Gate 3 (Manual)"
-
-
-def test_missing_playnite_file_falls_back_gracefully(monkeypatch, tmp_path):
-    monkeypatch.setattr(game_detector, "KNOWN_GAMES", {"game.exe": "My Game"})
-    monkeypatch.setattr(
-        "config.get_playnite_games_path",
-        lambda: str(tmp_path / "nonexistent.json"),
-    )
-    with patch("psutil.process_iter", return_value=[_proc("game.exe")]):
-        result = game_detector.get_running_game()
-    assert result == {"process": "game.exe", "display_name": "My Game"}
-
-
-def test_malformed_playnite_file_falls_back_gracefully(monkeypatch, tmp_path):
-    games_file = tmp_path / "euterpium_games.json"
-    games_file.write_text("not valid json{{")
-    monkeypatch.setattr(game_detector, "KNOWN_GAMES", {"game.exe": "My Game"})
-    monkeypatch.setattr("config.get_playnite_games_path", lambda: str(games_file))
-    with patch("psutil.process_iter", return_value=[_proc("game.exe")]):
-        result = game_detector.get_running_game()
-    assert result == {"process": "game.exe", "display_name": "My Game"}
-
-
-def test_playnite_process_matching_is_case_insensitive(monkeypatch, tmp_path):
-    games_file = tmp_path / "euterpium_games.json"
-    games_file.write_text(json.dumps([{"process": "BG3.exe", "name": "Baldur's Gate 3"}]))
-    monkeypatch.setattr(game_detector, "KNOWN_GAMES", {})
-    monkeypatch.setattr("config.get_playnite_games_path", lambda: str(games_file))
-    with patch("psutil.process_iter", return_value=[_proc("bg3.exe")]):
-        result = game_detector.get_running_game()
-    assert result == {"process": "bg3.exe", "display_name": "Baldur's Gate 3"}
-
-
-def test_load_playnite_games_returns_empty_when_file_missing(monkeypatch, tmp_path):
-    monkeypatch.setattr(
-        "config.get_playnite_games_path",
-        lambda: str(tmp_path / "nonexistent.json"),
-    )
-    assert game_detector._load_playnite_games() == {}
-
-
-def test_load_playnite_games_skips_entries_missing_fields(monkeypatch, tmp_path):
-    games_file = tmp_path / "euterpium_games.json"
-    games_file.write_text(
-        json.dumps(
-            [
-                {"process": "good.exe", "name": "Good Game"},
-                {"process": "no_name.exe"},
-                {"name": "No Process"},
-                {},
-            ]
-        )
-    )
-    monkeypatch.setattr("config.get_playnite_games_path", lambda: str(games_file))
-    result = game_detector._load_playnite_games()
-    assert result == {"good.exe": "Good Game"}
-
-
-# ── Playnite cache ────────────────────────────────────────────────────────────
-
-
-def test_playnite_cache_avoids_reparse_on_same_mtime(monkeypatch, tmp_path):
-    games_file = tmp_path / "euterpium_games.json"
-    games_file.write_text(json.dumps([{"process": "game.exe", "name": "Game"}]))
-    monkeypatch.setattr("config.get_playnite_games_path", lambda: str(games_file))
-    monkeypatch.setattr(game_detector, "_playnite_cache", None)
-
-    call_count = 0
-    real_load = json.load
-
-    def counting_load(f):
-        nonlocal call_count
-        call_count += 1
-        return real_load(f)
-
-    with patch("game_detector.json.load", side_effect=counting_load):
-        game_detector._load_playnite_games()
-        game_detector._load_playnite_games()
-
-    assert call_count == 1
-
-
-def test_playnite_cache_refreshes_when_mtime_changes(monkeypatch, tmp_path):
-    import os
-
-    games_file = tmp_path / "euterpium_games.json"
-    games_file.write_text(json.dumps([{"process": "old.exe", "name": "Old Game"}]))
-    monkeypatch.setattr("config.get_playnite_games_path", lambda: str(games_file))
-    monkeypatch.setattr(game_detector, "_playnite_cache", None)
-
-    first = game_detector._load_playnite_games()
-    assert first == {"old.exe": "Old Game"}
-
-    # Overwrite with new content and bump mtime so the cache key changes
-    games_file.write_text(json.dumps([{"process": "new.exe", "name": "New Game"}]))
-    mtime = os.path.getmtime(str(games_file))
-    os.utime(str(games_file), (mtime + 1, mtime + 1))
-
-    second = game_detector._load_playnite_games()
-    assert second == {"new.exe": "New Game"}

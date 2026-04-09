@@ -135,7 +135,7 @@ If an API key is set in the active profile, requests include an `Authorization: 
 
 ## Playnite integration
 
-Euterpium includes a Playnite generic plugin that automatically exports your game library so `game_detector.py` can identify running games without any manual `[games]` configuration.
+Euterpium includes a Playnite generic plugin that automatically tells Euterpium when a game starts and stops. When a game is launched via Playnite, the plugin writes a small JSON file; Euterpium picks it up on the next poll cycle and switches to game audio fingerprinting mode. Works for Steam, GOG, Epic, emulators — any source Playnite can launch.
 
 See [docs/playnite-plugin.md](docs/playnite-plugin.md) for build, install, and auto-update instructions.
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using Newtonsoft.Json;
 using Playnite.SDK;
@@ -13,10 +14,20 @@ namespace EuterpiumExporter
     {
         private static readonly ILogger logger = LogManager.GetLogger();
 
-        private readonly string _exportPath = Path.Combine(
+        // Exe name substrings (lowercase) for distinctive support binaries that are
+        // not the main game executable, used as a fallback when Playnite doesn't
+        // provide a process ID. Keep these specific to avoid excluding real games.
+        private static readonly string[] _nonGameExePatterns = new[]
+        {
+            "unins", "setup", "install", "redist", "vcredist", "dxsetup",
+            "dotnet", "crashreporter", "crashpad_handler", "reporter", "launcher_fixes",
+            "steam_", "easyanticheat", "eac_launcher", "battleye", "be_service",
+        };
+
+        private readonly string _currentGamePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "Playnite",
-            "euterpium_games.json"
+            "euterpium_current_game.json"
         );
 
         public override Guid Id { get; } = Guid.Parse("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
@@ -25,63 +36,189 @@ namespace EuterpiumExporter
 
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
-            ExportGames();
-            PlayniteApi.Database.Games.ItemCollectionChanged += (_, __) => ExportGames();
-            PlayniteApi.Database.Games.ItemUpdated += (_, __) => ExportGames();
+            // Clear any stale file left by a previous crash
+            TryDeleteCurrentGameFile("startup");
+            logger.Info("EuterpiumExporter: ready");
         }
 
-        private void ExportGames()
+        public override void OnGameStarted(OnGameStartedEventArgs args)
         {
+            var game = args.Game;
+            string exeName = null;
+
+            // Prefer the actual process name from the PID Playnite gives us
+            if (args.StartedProcessId.HasValue)
+            {
+                try
+                {
+                    var proc = Process.GetProcessById(args.StartedProcessId.Value);
+                    exeName = proc.MainModule?.ModuleName;
+                }
+                catch (Exception ex)
+                {
+                    logger.Warn($"EuterpiumExporter: could not get process name from PID {args.StartedProcessId}: {ex.Message}");
+                }
+            }
+
+            // Fall back to resolving from game configuration / install directory
+            if (string.IsNullOrWhiteSpace(exeName))
+                exeName = FindGameExe(game);
+
+            if (string.IsNullOrWhiteSpace(exeName))
+            {
+                logger.Warn($"EuterpiumExporter: could not determine exe for '{game.Name}' — game will not be detected");
+                return;
+            }
+
+            var entry = new CurrentGameEntry
+            {
+                Process = exeName,
+                Name = game.Name,
+                Pid = args.StartedProcessId,
+            };
+
+            var currentGameJson = JsonConvert.SerializeObject(entry, Formatting.Indented);
+            WriteCurrentGameFileAtomically(currentGameJson);
+            logger.Info($"EuterpiumExporter: game started — {game.Name} ({exeName})");
+        }
+
+        private void WriteCurrentGameFileAtomically(string contents)
+        {
+            var directory = Path.GetDirectoryName(_currentGamePath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            var tempPath = Path.Combine(
+                directory ?? string.Empty,
+                Path.GetFileName(_currentGamePath) + "." + Guid.NewGuid().ToString("N") + ".tmp"
+            );
+
             try
             {
-                var entries = new List<GameEntry>();
+                File.WriteAllText(tempPath, contents);
 
-                foreach (var game in PlayniteApi.Database.Games)
+                if (File.Exists(_currentGamePath))
                 {
-                    if (game.GameActions == null)
-                        continue;
-
-                    foreach (var action in game.GameActions)
-                    {
-                        if (!action.IsPlayAction || action.Type != GameActionType.File)
-                            continue;
-
-                        var resolvedPath = PlayniteApi.ExpandGameVariables(game, action.Path);
-                        if (string.IsNullOrWhiteSpace(resolvedPath))
-                            continue;
-
-                        var exe = Path.GetFileName(resolvedPath);
-                        if (string.IsNullOrWhiteSpace(exe))
-                            continue;
-
-                        entries.Add(new GameEntry { Process = exe, Name = game.Name });
-                        break; // one entry per game
-                    }
+                    File.Replace(tempPath, _currentGamePath, null);
+                }
+                else
+                {
+                    File.Move(tempPath, _currentGamePath);
+                }
+            }
+            catch
+            {
+                if (File.Exists(tempPath))
+                {
+                    File.Delete(tempPath);
                 }
 
-                var json = JsonConvert.SerializeObject(entries, Formatting.Indented);
-                var dir = Path.GetDirectoryName(_exportPath);
-                var tmp = Path.Combine(dir, Path.GetRandomFileName());
-                File.WriteAllText(tmp, json);
-                if (File.Exists(_exportPath))
-                    File.Replace(tmp, _exportPath, null);
-                else
-                    File.Move(tmp, _exportPath);
-                logger.Info($"EuterpiumExporter: exported {entries.Count} game(s) to {_exportPath}");
+                throw;
+            }
+        }
+
+        public override void OnGameStopped(OnGameStoppedEventArgs args)
+        {
+            TryDeleteCurrentGameFile($"game stopped — {args.Game.Name}");
+            logger.Info($"EuterpiumExporter: game stopped — {args.Game.Name}");
+        }
+
+        private void TryDeleteCurrentGameFile(string context)
+        {
+            if (!File.Exists(_currentGamePath))
+                return;
+
+            try
+            {
+                File.Delete(_currentGamePath);
+                logger.Info($"EuterpiumExporter: current game file deleted ({context})");
             }
             catch (Exception ex)
             {
-                logger.Error(ex, "EuterpiumExporter: failed to export games");
+                logger.Warn($"EuterpiumExporter: failed to delete current game file ({context}): {ex.Message}");
             }
+        }
+
+        // Fallback exe resolution when Playnite doesn't provide a process ID.
+        // Tries explicit File-type play actions first, then scans the install directory.
+        private string FindGameExe(Game game)
+        {
+            if (game.GameActions != null)
+            {
+                foreach (var action in game.GameActions)
+                {
+                    if (!action.IsPlayAction || action.Type != GameActionType.File)
+                        continue;
+
+                    var resolved = PlayniteApi.ExpandGameVariables(game, action.Path);
+                    if (string.IsNullOrWhiteSpace(resolved))
+                        continue;
+
+                    var exe = Path.GetFileName(resolved);
+                    if (!string.IsNullOrWhiteSpace(exe))
+                        return exe;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(game.InstallDirectory) ||
+                !Directory.Exists(game.InstallDirectory))
+                return null;
+
+            try
+            {
+                var candidates = Directory
+                    .GetFiles(game.InstallDirectory, "*.exe", SearchOption.TopDirectoryOnly)
+                    .Select(Path.GetFileName)
+                    .Where(f => !IsNonGameExe(f))
+                    .ToList();
+
+                if (candidates.Count == 1)
+                    return candidates[0];
+
+                if (candidates.Count > 1)
+                {
+                    var slug = new string(game.Name
+                        .ToLowerInvariant()
+                        .Where(char.IsLetterOrDigit)
+                        .ToArray());
+
+                    return candidates.FirstOrDefault(f =>
+                    {
+                        var nameSlug = new string(
+                            Path.GetFileNameWithoutExtension(f)
+                                .ToLowerInvariant()
+                                .Where(char.IsLetterOrDigit)
+                                .ToArray());
+                        return nameSlug.Contains(slug) || slug.Contains(nameSlug);
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Warn($"EuterpiumExporter: could not scan install dir for '{game.Name}': {ex.Message}");
+            }
+
+            return null;
+        }
+
+        private static bool IsNonGameExe(string filename)
+        {
+            var lower = filename.ToLowerInvariant();
+            return _nonGameExePatterns.Any(p => lower.Contains(p));
         }
     }
 
-    internal class GameEntry
+    internal class CurrentGameEntry
     {
         [JsonProperty("process")]
         public string Process { get; set; }
 
         [JsonProperty("name")]
         public string Name { get; set; }
+
+        [JsonProperty("pid")]
+        public int? Pid { get; set; }
     }
 }

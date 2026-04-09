@@ -1,18 +1,25 @@
 # Euterpium Exporter — Playnite Plugin
 
-A Playnite generic plugin that automatically exports your game library to a JSON file so Euterpium can detect running games without manual configuration.
+A Playnite generic plugin that tells Euterpium when a game starts and stops,
+so game audio fingerprinting works automatically without manual `[games]` config.
 
 ## How it works
 
-On startup (and whenever games are added, removed, or edited), the plugin writes:
+When a game is launched via Playnite, the plugin writes:
 
 ```
-%APPDATA%\Playnite\euterpium_games.json
+%APPDATA%\Playnite\euterpium_current_game.json
 ```
 
-Euterpium reads this file on each detection cycle and merges it with any manual `[games]` entries in `euterpium.ini`. Manual entries take precedence over Playnite-detected ones.
+When the game stops, the file is deleted. Euterpium reads this file on each
+detection cycle — if it exists and the process is still alive, game mode
+(WASAPI loopback + ACRCloud fingerprinting) is active.
 
-Only games with a `File`-type play action are exported — the plugin resolves `{InstallDir}` and similar variables to extract the actual `.exe` filename.
+On Playnite startup, any stale file from a previous crash is cleared.
+
+Works for all sources Playnite can launch: Steam, GOG, Epic, emulators, etc.
+Games launched *outside* Playnite are still covered by manual `[games]` entries
+in `euterpium.ini`.
 
 ## Building
 
@@ -46,9 +53,15 @@ Playnite will check this manifest and prompt you when a new version is available
 
 ## Config
 
-By default Euterpium reads the JSON from `%APPDATA%\Playnite\euterpium_games.json`. To override the path, add to `euterpium.ini`:
+By default Euterpium looks for the current game file at
+`%APPDATA%\Playnite\euterpium_current_game.json`. To override the path,
+add to `euterpium.ini`:
 
 ```ini
 [playnite]
-games_file = C:\path\to\euterpium_games.json
+current_game_file = C:\path\to\euterpium_current_game.json
 ```
+
+## Future: REST API
+
+When issue [#16](https://github.com/aquarion/euterpium/issues/16) (local REST API) is implemented, the plugin will be updated to POST to `localhost:43174/api/game/start` and `/api/game/stop` instead of writing a file. The event-driven logic stays the same.
