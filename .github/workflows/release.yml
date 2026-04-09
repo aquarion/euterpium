@@ -27,6 +27,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "6.x"
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -90,6 +95,19 @@ jobs:
         run: poetry run pytest --tb=short -q
         shell: pwsh
 
+      - name: Build Playnite plugin
+        shell: pwsh
+        run: |
+          $version = $env:APP_VERSION
+          (Get-Content playnite-plugin\extension.yaml) -replace '^Version:.*', "Version: $version" |
+            Set-Content playnite-plugin\extension.yaml
+          dotnet build playnite-plugin\EuterpiumExporter.csproj --configuration Release
+          $versionUnderscored = $version -replace '\.', '_'
+          $pext = "EuterpiumExporter_a1b2c3d4-e5f6-7890-abcd-ef1234567890_${versionUnderscored}.pext"
+          $outDir = "playnite-plugin\bin\Release\net462"
+          Compress-Archive -Path "$outDir\EuterpiumExporter.dll", "$outDir\extension.yaml", "$outDir\icon.png" -DestinationPath $pext
+          echo "PLUGIN_ZIP=$pext" >> $env:GITHUB_ENV
+
       - name: Build with PyInstaller
         run: poetry run pyinstaller euterpium.spec
 
@@ -136,6 +154,7 @@ jobs:
             ${{ env.ZIP_NAME }}
             ${{ env.INSTALLER_NAME }}
             ${{ env.CHECKSUM_NAME }}
+            ${{ env.PLUGIN_ZIP }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -150,6 +169,7 @@ jobs:
           Remove-Item ${{ env.ZIP_NAME }}
           Remove-Item ${{ env.INSTALLER_NAME }}
           Remove-Item ${{ env.CHECKSUM_NAME }}
+          Remove-Item ${{ env.PLUGIN_ZIP }}
         shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

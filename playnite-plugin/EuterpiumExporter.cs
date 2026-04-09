@@ -27,6 +27,7 @@ namespace EuterpiumExporter
         {
             ExportGames();
             PlayniteApi.Database.Games.ItemCollectionChanged += (_, __) => ExportGames();
+            PlayniteApi.Database.Games.ItemUpdated += (_, __) => ExportGames();
         }
 
         private void ExportGames()
