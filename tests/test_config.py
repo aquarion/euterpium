@@ -1,5 +1,7 @@
 # tests/test_config.py — config read/write, profiles, migration, validation
 
+import logging
+
 import config
 
 # ── Configured checks ─────────────────────────────────────────────────────────
@@ -177,3 +179,25 @@ def test_getint_returns_valid_value(tmp_config):
     config.save({"audio": {"sample_rate": "22050"}})
     cfg = config._load()
     assert config._getint(cfg, "audio", "sample_rate", 44100) == 22050
+
+
+# ── Logging level ─────────────────────────────────────────────────────────────
+
+
+def test_get_log_level_default_is_info(tmp_config):
+    assert config.get_log_level() == logging.INFO
+
+
+def test_get_log_level_returns_debug(tmp_config):
+    config.save({"logging": {"level": "DEBUG"}})
+    assert config.get_log_level() == logging.DEBUG
+
+
+def test_get_log_level_case_insensitive(tmp_config):
+    config.save({"logging": {"level": "warning"}})
+    assert config.get_log_level() == logging.WARNING
+
+
+def test_get_log_level_falls_back_to_info_on_invalid(tmp_config):
+    config.save({"logging": {"level": "NOTAVALIDLEVEL"}})
+    assert config.get_log_level() == logging.INFO
