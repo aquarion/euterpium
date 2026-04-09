@@ -30,8 +30,9 @@ def _get_playnite_current_game() -> dict | None:
             logger.debug("Playnite current game file has stale PID %d — ignoring", pid)
             return None
 
+        process_name = str(data["process"]).strip().lower()
         _current_game_logged_missing = False
-        return {"process": data["process"], "display_name": data["name"]}
+        return {"process": process_name, "display_name": data["name"]}
 
     except FileNotFoundError:
         if not _current_game_logged_missing:
