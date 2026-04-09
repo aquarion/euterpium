@@ -26,6 +26,8 @@ def _load_playnite_games() -> dict[str, str]:
     try:
         mtime = os.path.getmtime(path)
     except OSError:
+        if _playnite_cache is None:
+            logger.info("Playnite games file not found: %s", path)
         return {}
 
     if _playnite_cache is not None and _playnite_cache[0] == mtime:
@@ -39,11 +41,11 @@ def _load_playnite_games() -> dict[str, str]:
             for entry in data
             if "process" in entry and "name" in entry
         }
-        logger.debug("Loaded %d game(s) from Playnite (%s)", len(games), path)
+        logger.info("Loaded %d game(s) from Playnite (%s)", len(games), path)
         _playnite_cache = (mtime, games)
         return games
     except Exception as e:
-        logger.debug("Could not load Playnite games from %s: %s", path, e)
+        logger.warning("Could not load Playnite games from %s: %s", path, e)
         return {}
 
 

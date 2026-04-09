@@ -20,11 +20,11 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%H:%M:%S",
 )
-logging.getLogger("smtc").setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
 def main():
+    logging.getLogger().setLevel(config.get_log_level())
     logger.info("Starting Euterpium %s", __version__)
 
     # Report winsdk status now that logging is definitely active

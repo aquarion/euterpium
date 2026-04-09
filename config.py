@@ -97,6 +97,19 @@ def _getfloat(cfg: configparser.ConfigParser, section: str, key: str, fallback: 
         return fallback
 
 
+# ── Logging ───────────────────────────────────────────────────────────────────
+
+
+def get_log_level() -> int:
+    """Returns the configured logging level (default: INFO)."""
+    raw = _cfg().get("logging", "level", fallback="INFO").strip().upper()
+    level = getattr(logging, raw, None)
+    if not isinstance(level, int):
+        logger.warning("Invalid log level %r in config — using INFO", raw)
+        return logging.INFO
+    return level
+
+
 # ── Configured checks ────────────────────────────────────────────────────────
 
 _PLACEHOLDER_URLS = {"", "https://your-api.com/now-playing"}
