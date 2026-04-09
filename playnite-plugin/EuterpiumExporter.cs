@@ -15,13 +15,14 @@ namespace EuterpiumExporter
     {
         private static readonly ILogger logger = LogManager.GetLogger();
 
-        // Exe name substrings (lowercase) that are never the main game executable,
-        // used as a fallback when Playnite doesn't provide a process ID.
+        // Exe name substrings (lowercase) for distinctive support binaries that are
+        // not the main game executable, used as a fallback when Playnite doesn't
+        // provide a process ID. Keep these specific to avoid excluding real games.
         private static readonly string[] _nonGameExePatterns = new[]
         {
             "unins", "setup", "install", "redist", "vcredist", "dxsetup",
-            "dotnet", "crash", "report", "helper", "launcher_fixes",
-            "steam_", "easyanticheat", "battleye", "be_service",
+            "dotnet", "crashreporter", "crashpad_handler", "reporter", "launcher_fixes",
+            "steam_", "easyanticheat", "eac_launcher", "battleye", "be_service",
         };
 
         private readonly string _currentGamePath = Path.Combine(
