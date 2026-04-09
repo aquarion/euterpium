@@ -158,3 +158,47 @@ def test_load_playnite_games_skips_entries_missing_fields(monkeypatch, tmp_path)
     monkeypatch.setattr("config.get_playnite_games_path", lambda: str(games_file))
     result = game_detector._load_playnite_games()
     assert result == {"good.exe": "Good Game"}
+
+
+# ── Playnite cache ────────────────────────────────────────────────────────────
+
+
+def test_playnite_cache_avoids_reparse_on_same_mtime(monkeypatch, tmp_path):
+    games_file = tmp_path / "euterpium_games.json"
+    games_file.write_text(json.dumps([{"process": "game.exe", "name": "Game"}]))
+    monkeypatch.setattr("config.get_playnite_games_path", lambda: str(games_file))
+    monkeypatch.setattr(game_detector, "_playnite_cache", None)
+
+    call_count = 0
+    real_load = json.load
+
+    def counting_load(f):
+        nonlocal call_count
+        call_count += 1
+        return real_load(f)
+
+    with patch("game_detector.json.load", side_effect=counting_load):
+        game_detector._load_playnite_games()
+        game_detector._load_playnite_games()
+
+    assert call_count == 1
+
+
+def test_playnite_cache_refreshes_when_mtime_changes(monkeypatch, tmp_path):
+    import os
+
+    games_file = tmp_path / "euterpium_games.json"
+    games_file.write_text(json.dumps([{"process": "old.exe", "name": "Old Game"}]))
+    monkeypatch.setattr("config.get_playnite_games_path", lambda: str(games_file))
+    monkeypatch.setattr(game_detector, "_playnite_cache", None)
+
+    first = game_detector._load_playnite_games()
+    assert first == {"old.exe": "Old Game"}
+
+    # Overwrite with new content and bump mtime so the cache key changes
+    games_file.write_text(json.dumps([{"process": "new.exe", "name": "New Game"}]))
+    mtime = os.path.getmtime(str(games_file))
+    os.utime(str(games_file), (mtime + 1, mtime + 1))
+
+    second = game_detector._load_playnite_games()
+    assert second == {"new.exe": "New Game"}
