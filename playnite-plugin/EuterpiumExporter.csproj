@@ -1,14 +1,33 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0-windows</TargetFramework>
+    <TargetFramework>net462</TargetFramework>
     <AssemblyName>EuterpiumExporter</AssemblyName>
-    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
     <Platforms>x64</Platforms>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="PlayniteSDK" Version="6.*" />
+    <PackageReference Include="Newtonsoft.Json" Version="10.*" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Include="extension.yaml" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+
+  <Target Name="DeployToPlaynite" AfterTargets="Build">
+    <PropertyGroup>
+      <PlayniteExtDir>$(APPDATA)\Playnite\Extensions\EuterpiumExporter_a1b2c3d4-e5f6-7890-abcd-ef1234567890</PlayniteExtDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(PlayniteExtDir)" />
+    <ItemGroup>
+      <DeployFiles Include="$(OutputPath)\EuterpiumExporter.dll" />
+      <DeployFiles Include="$(OutputPath)\extension.yaml" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DeployFiles)" DestinationFolder="$(PlayniteExtDir)" />
+    <Message Text="Deployed to $(PlayniteExtDir)" Importance="high" />
+  </Target>
 
 </Project>

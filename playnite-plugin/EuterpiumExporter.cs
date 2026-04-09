@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using Newtonsoft.Json;
 using Playnite.SDK;
+using Playnite.SDK.Events;
 using Playnite.SDK.Models;
 using Playnite.SDK.Plugins;
 
@@ -58,7 +58,7 @@ namespace EuterpiumExporter
                     }
                 }
 
-                var json = JsonSerializer.Serialize(entries, new JsonSerializerOptions { WriteIndented = true });
+                var json = JsonConvert.SerializeObject(entries, Formatting.Indented);
                 File.WriteAllText(_exportPath, json);
                 logger.Info($"EuterpiumExporter: exported {entries.Count} game(s) to {_exportPath}");
             }
@@ -71,10 +71,10 @@ namespace EuterpiumExporter
 
     internal class GameEntry
     {
-        [JsonPropertyName("process")]
+        [JsonProperty("process")]
         public string Process { get; set; }
 
-        [JsonPropertyName("name")]
+        [JsonProperty("name")]
         public string Name { get; set; }
     }
 }
