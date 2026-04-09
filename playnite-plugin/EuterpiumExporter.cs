@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using Newtonsoft.Json;
 using Playnite.SDK;
 using Playnite.SDK.Events;
