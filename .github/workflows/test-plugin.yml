@@ -1,0 +1,25 @@
+name: "[Tests] Playnite Plugin Build"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "playnite-plugin/**"
+  pull_request:
+    paths:
+      - "playnite-plugin/**"
+
+jobs:
+  build-plugin:
+    name: Build Playnite plugin
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "6.x"
+
+      - name: Build
+        run: dotnet build playnite-plugin\EuterpiumExporter.csproj --configuration Release
