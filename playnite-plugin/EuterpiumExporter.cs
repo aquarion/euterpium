@@ -39,8 +39,15 @@ namespace EuterpiumExporter
             // Clear any stale file left by a previous crash
             if (File.Exists(_currentGamePath))
             {
-                File.Delete(_currentGamePath);
-                logger.Info("EuterpiumExporter: cleared stale current game file on startup");
+                try
+                {
+                    File.Delete(_currentGamePath);
+                    logger.Info("EuterpiumExporter: cleared stale current game file on startup");
+                }
+                catch (Exception ex)
+                {
+                    logger.Warn($"EuterpiumExporter: failed to clear stale current game file '{_currentGamePath}': {ex.Message}");
+                }
             }
 
             logger.Info("EuterpiumExporter: ready");
