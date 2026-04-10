@@ -58,6 +58,15 @@ Non-Windows: `winsdk` / `win11toast` are platform-conditional deps. SMTC tests
 mock the import. Tests that exercise Windows-only code guard themselves with
 `pytest.importorskip` or `unittest.mock`.
 
+### Test conventions (`tests/conftest.py`)
+
+- `conftest.py` inserts `app/` onto `sys.path` at collection time, so test
+  files can do bare `import config`, `import tracker`, etc. without any
+  package installation.
+- The `tmp_config` fixture redirects `_CONFIG_PATH` and `_CONFIG_DIR` to a
+  fresh `tmp_path` via `monkeypatch`, so tests never touch the real user config
+  file. Use it in any test that reads or writes config.
+
 ---
 
 ## Config (`config.py`)
