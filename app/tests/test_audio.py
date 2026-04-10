@@ -276,6 +276,7 @@ def test_capture_audio_returns_array_on_success(monkeypatch):
     result = audio_capture.capture_audio(seconds=0.1)
     assert result is not None
     assert isinstance(result, np.ndarray)
+    np.testing.assert_array_equal(result, np.zeros(int(44100 * 0.1), dtype=np.float32))
 
 
 def test_capture_audio_returns_none_on_record_error(monkeypatch):
