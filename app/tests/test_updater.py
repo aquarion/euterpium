@@ -645,10 +645,12 @@ def test_install_worker_emits_launched_on_success(monkeypatch, tmp_path):
         installer_name="euterpium-v0.2.0-setup.exe",
         installer_url="https://github.com/aquarion/euterpium/releases/download/v0.2.0/euterpium-v0.2.0-setup.exe",
     )
-    fake_path = tmp_path / "setup.exe"
+    update_tmp = tmp_path / "update-tmp"
+    update_tmp.mkdir()
+    fake_path = update_tmp / "setup.exe"
     monkeypatch.setattr(updater, "download_installer", lambda u, d: fake_path)
     monkeypatch.setattr(updater, "launch_installer", lambda p: None)
-    monkeypatch.setattr(updater.tempfile, "mkdtemp", lambda prefix: str(tmp_path))
+    monkeypatch.setattr(updater.tempfile, "mkdtemp", lambda prefix: str(update_tmp))
 
     manager._install_worker(update)
 
@@ -671,7 +673,9 @@ def test_install_worker_emits_error_on_failure(monkeypatch, tmp_path):
         "download_installer",
         lambda u, d: (_ for _ in ()).throw(updater.UpdateError("download failed")),
     )
-    monkeypatch.setattr(updater.tempfile, "mkdtemp", lambda prefix: str(tmp_path))
+    update_tmp = tmp_path / "update-tmp"
+    update_tmp.mkdir()
+    monkeypatch.setattr(updater.tempfile, "mkdtemp", lambda prefix: str(update_tmp))
 
     manager._install_worker(update)
 
