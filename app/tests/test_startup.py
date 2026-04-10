@@ -47,8 +47,8 @@ def test_disable_returns_false_on_non_windows():
 
 
 def test_is_enabled_returns_true_when_key_matches_exe(mock_winreg):
-    exe = startup._exe_path()
-    mock_winreg.QueryValueEx.return_value = (exe, mock_winreg.REG_SZ)
+    # Registry stores the quoted path that enable() writes
+    mock_winreg.QueryValueEx.return_value = (startup._exe_path(), mock_winreg.REG_SZ)
 
     with patch.object(startup.sys, "platform", "win32"):
         result = startup.is_enabled()
@@ -57,8 +57,19 @@ def test_is_enabled_returns_true_when_key_matches_exe(mock_winreg):
     mock_winreg.OpenKey.assert_called_once_with(mock_winreg.HKEY_CURRENT_USER, startup._REG_KEY)
 
 
+def test_is_enabled_matches_case_insensitively(mock_winreg):
+    """Registry path comparison should be case-insensitive (Windows paths)."""
+    quoted_upper = startup._exe_path().upper()
+    mock_winreg.QueryValueEx.return_value = (quoted_upper, mock_winreg.REG_SZ)
+
+    with patch.object(startup.sys, "platform", "win32"):
+        result = startup.is_enabled()
+
+    assert result is True
+
+
 def test_is_enabled_returns_false_when_key_points_to_different_exe(mock_winreg):
-    mock_winreg.QueryValueEx.return_value = ("C:\\other\\app.exe", mock_winreg.REG_SZ)
+    mock_winreg.QueryValueEx.return_value = ('"C:\\other\\app.exe"', mock_winreg.REG_SZ)
 
     with patch.object(startup.sys, "platform", "win32"):
         result = startup.is_enabled()
@@ -87,18 +98,16 @@ def test_is_enabled_returns_false_on_exception(mock_winreg):
 # ── enable ────────────────────────────────────────────────────────────────────
 
 
-def test_enable_writes_registry_entry(mock_winreg):
+def test_enable_writes_quoted_registry_entry(mock_winreg):
     with patch.object(startup.sys, "platform", "win32"):
         result = startup.enable()
 
     assert result is True
-    mock_winreg.SetValueEx.assert_called_once_with(
-        mock_winreg.OpenKey.return_value,
-        startup._REG_VALUE,
-        0,
-        mock_winreg.REG_SZ,
-        startup._exe_path(),
+    written_value = mock_winreg.SetValueEx.call_args[0][4]
+    assert written_value.startswith('"') and written_value.endswith('"'), (
+        "Registered path should be quoted to handle spaces"
     )
+    assert startup.sys.executable in written_value
 
 
 def test_enable_opens_key_with_write_access(mock_winreg):

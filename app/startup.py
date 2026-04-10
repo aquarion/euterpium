@@ -3,6 +3,11 @@
 # Manages the HKCU\Software\Microsoft\Windows\CurrentVersion\Run entry
 # so Euterpium can optionally launch when Windows starts.
 # No-ops silently on non-Windows platforms.
+#
+# Note: this is only meaningful when running as a PyInstaller bundle —
+# sys.executable points to the .exe in that case. When running from source
+# (poetry run python main.py) it points to the Python interpreter, which
+# would not start the app correctly. The UI hides the option on non-win32.
 
 import logging
 import sys
@@ -14,8 +19,13 @@ _REG_VALUE = "Euterpium"
 
 
 def _exe_path() -> str:
-    """Return the path to register — the running executable."""
-    return sys.executable
+    """Return the path to register — quoted to handle spaces."""
+    return f'"{sys.executable}"'
+
+
+def _parse_exe_path(value: str) -> str:
+    """Strip wrapping quotes from a registry value for comparison."""
+    return value.strip('"')
 
 
 def is_enabled() -> bool:
@@ -27,7 +37,7 @@ def is_enabled() -> bool:
 
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, _REG_KEY) as key:
             value, _ = winreg.QueryValueEx(key, _REG_VALUE)
-            return value == _exe_path()
+            return _parse_exe_path(value).lower() == sys.executable.lower()
     except FileNotFoundError:
         return False
     except Exception as e:
