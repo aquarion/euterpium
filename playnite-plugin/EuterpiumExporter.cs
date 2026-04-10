@@ -71,11 +71,12 @@ namespace EuterpiumExporter
                 return;
             }
 
+        // Build payload using the already-resolved pid variable; treat 0 as absent.
             var payload = JsonConvert.SerializeObject(new
             {
                 process = exeName,
                 name = game.Name,
-                pid = args.StartedProcessId > 0 ? (int?)args.StartedProcessId : null,
+                pid = pid > 0 ? (int?)pid : null,
             });
 
             PostToEuterpiumApi("/api/game/start", payload);
@@ -93,7 +94,9 @@ namespace EuterpiumExporter
             try
             {
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
-                var response = _httpClient.PostAsync(path, content).GetAwaiter().GetResult();
+                // Task.Run detaches from any ambient SynchronizationContext, avoiding
+                // the deadlock that GetAwaiter().GetResult() can cause on .NET Framework.
+                var response = Task.Run(() => _httpClient.PostAsync(path, content)).GetAwaiter().GetResult();
                 if (!response.IsSuccessStatusCode)
                 {
                     logger.Warn($"EuterpiumExporter: API call to {path} returned {(int)response.StatusCode}");

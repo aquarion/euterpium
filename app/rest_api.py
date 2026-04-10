@@ -129,7 +129,7 @@ def create_app(tracker) -> Flask:
 
     @ns_game.route("/start")
     class GameStart(Resource):
-        @ns_game.expect(game_input)
+        @ns_game.expect(game_input, validate=True)
         @ns_game.marshal_with(message_model, code=200)
         @ns_game.doc(description="Notify Euterpium that a game has started. Begins game-audio fingerprinting.")
         def post(self):
