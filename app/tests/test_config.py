@@ -181,6 +181,44 @@ def test_getint_returns_valid_value(tmp_config):
     assert config._getint(cfg, "audio", "sample_rate", 44100) == 22050
 
 
+# ── SMTC ignored apps ─────────────────────────────────────────────────────────
+
+
+def test_get_smtc_ignored_apps_default(tmp_config):
+    apps = config.get_smtc_ignored_apps()
+    assert "chrome.exe" in apps
+    assert "firefox.exe" in apps
+
+
+def test_get_smtc_ignored_apps_custom(tmp_config):
+    config.save({"smtc": {"ignore": "vlc.exe, winamp.exe"}})
+    apps = config.get_smtc_ignored_apps()
+    assert apps == ["vlc.exe", "winamp.exe"]
+
+
+def test_get_smtc_ignored_apps_lowercased(tmp_config):
+    config.save({"smtc": {"ignore": "CHROME.EXE,Firefox.EXE"}})
+    apps = config.get_smtc_ignored_apps()
+    assert apps == ["chrome.exe", "firefox.exe"]
+
+
+def test_get_smtc_ignored_apps_trims_whitespace(tmp_config):
+    config.save({"smtc": {"ignore": "  vlc.exe  ,  mpv.exe  "}})
+    apps = config.get_smtc_ignored_apps()
+    assert apps == ["vlc.exe", "mpv.exe"]
+
+
+def test_get_smtc_ignored_apps_empty_value(tmp_config):
+    config.save({"smtc": {"ignore": ""}})
+    assert config.get_smtc_ignored_apps() == []
+
+
+def test_get_smtc_ignored_apps_filters_blank_entries(tmp_config):
+    config.save({"smtc": {"ignore": "vlc.exe,,mpv.exe,"}})
+    apps = config.get_smtc_ignored_apps()
+    assert apps == ["vlc.exe", "mpv.exe"]
+
+
 # ── Logging level ─────────────────────────────────────────────────────────────
 
 

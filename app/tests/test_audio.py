@@ -146,3 +146,154 @@ def test_detector_returns_false_when_no_device(monkeypatch):
     monkeypatch.setattr(audio_capture, "get_loopback_device", lambda: None)
     detector = AudioChangeDetector()
     assert detector.check() is False
+
+
+def test_detector_returns_false_when_record_raises(monkeypatch):
+    import audio_capture
+
+    class FailingRecorder:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def record(self, numframes):
+            raise RuntimeError("device disconnected")
+
+    class FailingDevice:
+        def recorder(self, samplerate):
+            return FailingRecorder()
+
+    monkeypatch.setattr(audio_capture, "get_loopback_device", lambda: FailingDevice())
+    detector = AudioChangeDetector()
+    assert detector.check() is False
+
+
+def test_detector_increments_quiet_count_on_silence(monkeypatch):
+    import audio_capture
+
+    # Use a very small amplitude that is below the 0.01 quiet threshold
+    amplitudes = [0.001, 0.001, 0.001]
+    idx = [0]
+
+    def mock_device():
+        amp = amplitudes[min(idx[0], len(amplitudes) - 1)]
+        idx[0] += 1
+        return _make_mock_loopback([amp])
+
+    monkeypatch.setattr(audio_capture, "get_loopback_device", mock_device)
+    # Suppress both triggers so we can observe the count incrementing
+    monkeypatch.setattr(audio_capture, "MIN_SILENCE_BEFORE_CHANGE", 999)
+    monkeypatch.setattr(audio_capture, "CHANGE_THRESHOLD", 999.0)
+    detector = AudioChangeDetector()
+    detector.check()  # baseline at ~0 (quiet)
+    detector.check()  # quiet — increments count
+    assert detector._quiet_count == 1
+
+
+def test_detector_signals_change_after_sustained_silence(monkeypatch):
+    import audio_capture
+
+    # Drive quiet_count to MIN_SILENCE_BEFORE_CHANGE by returning silence repeatedly
+    silence = 0.0
+    loud = 0.5
+    amplitudes = [loud] + [silence] * 10
+
+    idx = [0]
+
+    def mock_device():
+        amp = amplitudes[min(idx[0], len(amplitudes) - 1)]
+        idx[0] += 1
+        return _make_mock_loopback([amp])
+
+    monkeypatch.setattr(audio_capture, "get_loopback_device", mock_device)
+    monkeypatch.setattr(audio_capture, "MIN_SILENCE_BEFORE_CHANGE", 3)
+    # Also suppress the delta threshold so only silence triggers the change
+    monkeypatch.setattr(audio_capture, "CHANGE_THRESHOLD", 999.0)
+
+    detector = AudioChangeDetector()
+    detector.check()  # baseline at loud
+    detector.check()  # quiet count 1
+    detector.check()  # quiet count 2
+    result = detector.check()  # quiet count hits 3 → change
+    assert result is True
+
+
+# ── get_loopback_device ───────────────────────────────────────────────────────
+
+
+def test_get_loopback_device_returns_device(monkeypatch):
+    import audio_capture
+
+    class FakeSpeaker:
+        name = "Fake Speakers"
+
+    class FakeLoopback:
+        pass
+
+    class FakeSC:
+        def default_speaker(self):
+            return FakeSpeaker()
+
+        def get_microphone(self, id, include_loopback):
+            assert id == "Fake Speakers"
+            assert include_loopback is True
+            return FakeLoopback()
+
+    fake_sc = FakeSC()
+    monkeypatch.setitem(__import__("sys").modules, "soundcard", fake_sc)
+    result = audio_capture.get_loopback_device()
+    assert isinstance(result, FakeLoopback)
+
+
+def test_get_loopback_device_returns_none_on_error(monkeypatch):
+    import audio_capture
+
+    class BrokenSC:
+        def default_speaker(self):
+            raise OSError("no audio device")
+
+    monkeypatch.setitem(__import__("sys").modules, "soundcard", BrokenSC())
+    result = audio_capture.get_loopback_device()
+    assert result is None
+
+
+# ── capture_audio ─────────────────────────────────────────────────────────────
+
+
+def test_capture_audio_returns_none_when_no_device(monkeypatch):
+    import audio_capture
+
+    monkeypatch.setattr(audio_capture, "get_loopback_device", lambda: None)
+    assert audio_capture.capture_audio() is None
+
+
+def test_capture_audio_returns_array_on_success(monkeypatch):
+    import audio_capture
+
+    monkeypatch.setattr(audio_capture, "get_loopback_device", lambda: _make_mock_loopback([0.0]))
+    result = audio_capture.capture_audio(seconds=0.1)
+    assert result is not None
+    assert isinstance(result, np.ndarray)
+
+
+def test_capture_audio_returns_none_on_record_error(monkeypatch):
+    import audio_capture
+
+    class FailingRecorder:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def record(self, numframes):
+            raise RuntimeError("capture failed")
+
+    class FailingDevice:
+        def recorder(self, samplerate):
+            return FailingRecorder()
+
+    monkeypatch.setattr(audio_capture, "get_loopback_device", lambda: FailingDevice())
+    assert audio_capture.capture_audio() is None
