@@ -13,6 +13,9 @@ updates:
     directory: "/playnite-plugin"
     schedule:
       interval: "weekly"
+    ignore:
+      # Pinned to match Playnite's bundled version — cannot upgrade independently
+      - dependency-name: "Newtonsoft.Json"
   - package-ecosystem: github-actions
     directory: "/" # Location of package manifests
     schedule:

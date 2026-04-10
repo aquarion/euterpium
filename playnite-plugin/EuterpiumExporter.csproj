@@ -9,6 +9,9 @@
 
   <ItemGroup>
     <PackageReference Include="PlayniteSDK" Version="6.*" />
+    <!-- Pinned to 10.* to match Playnite's bundled version — the plugin runs inside
+         Playnite's process and uses its copy at runtime, so upgrading here would
+         build against a newer API than is actually available. -->
     <PackageReference Include="Newtonsoft.Json" Version="10.*" />
   </ItemGroup>
 
