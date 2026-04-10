@@ -186,7 +186,7 @@ cython_debug/
 #  that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
 #  and can be added to the global gitignore or merged into this file. However, if you prefer,
 #  you could uncomment the following to ignore the entire vscode folder
-# .vscode/
+.vscode/
 
 # Ruff stuff:
 .ruff_cache/
@@ -200,6 +200,12 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# Claude
+# Claude is an AI assistant by Anthropic. `.claudeignore` specifies files/directories to
+# exclude from AI features like autocomplete and code analysis. Recommended for sensitive data
+.claudeignore
+.claude/settings.local.*
 
 # Marimo
 marimo/_static/
