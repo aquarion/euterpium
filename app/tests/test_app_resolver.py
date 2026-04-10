@@ -173,7 +173,7 @@ def test_resolve_from_aumid_falls_back_to_registry_on_windowsapps_exception(monk
 
 
 def test_resolve_from_registry_returns_none_without_winreg(monkeypatch):
-    monkeypatch.setitem(sys.modules, "winreg", None)
+    monkeypatch.delitem(sys.modules, "winreg", raising=False)
     assert app_resolver._resolve_from_registry("some.app") is None
 
 
