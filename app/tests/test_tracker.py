@@ -27,6 +27,8 @@ def running_tracker():
     tracker.start()
     yield tracker
     tracker.stop()
+    if tracker._thread:
+        tracker._thread.join(timeout=1.0)
 
 
 def _wait_for_manual_fingerprint(tracker, timeout=2.0):
@@ -40,8 +42,11 @@ def _wait_for_manual_fingerprint(tracker, timeout=2.0):
     else:
         pytest.fail("Manual fingerprint did not complete within timeout")
     events = []
-    while not tracker.event_queue.empty():
-        events.append(tracker.event_queue.get_nowait())
+    while True:
+        try:
+            events.append(tracker.event_queue.get_nowait())
+        except queue.Empty:
+            break
     return events
 
 
@@ -526,14 +531,22 @@ def loop_tracker():
     trk._stop_event.set()
     if trk._thread:
         trk._thread.join(timeout=1.0)
+        if trk._thread.is_alive():
+            pytest.fail(
+                "loop_tracker teardown failed: tracker _run thread did not stop within 1.0s"
+            )
 
 
 def _join_and_drain(trk, timeout=2.0):
     """Wait for the _run thread to finish, then return all queued events."""
     trk._thread.join(timeout=timeout)
+    assert not trk._thread.is_alive(), "_run thread did not finish before timeout"
     events = []
-    while not trk.event_queue.empty():
-        events.append(trk.event_queue.get_nowait())
+    while True:
+        try:
+            events.append(trk.event_queue.get_nowait())
+        except queue.Empty:
+            break
     return events
 
 
