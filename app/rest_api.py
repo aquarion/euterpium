@@ -50,11 +50,13 @@ def create_app(tracker) -> Flask:
         {
             "process": fields.String(
                 required=True,
+                pattern=r"\S+",
                 description="Executable filename (e.g. witcher3.exe)",
                 example="witcher3.exe",
             ),
             "name": fields.String(
                 required=True,
+                pattern=r"\S+",
                 description="Human-readable game name",
                 example="The Witcher 3",
             ),
@@ -133,14 +135,13 @@ def create_app(tracker) -> Flask:
         @ns_game.marshal_with(message_model, code=200)
         @ns_game.doc(description="Notify Euterpium that a game has started. Begins game-audio fingerprinting.")
         def post(self):
-            data = api.payload or {}
-            process = (data.get("process") or "").strip()
-            name = (data.get("name") or "").strip()
-            pid = data.get("pid")
-            if not process or not name:
-                ns_game.abort(400, "Both 'process' and 'name' are required")
-            game_detector.set_current_game(process=process, name=name, pid=pid)
-            return {"message": f"Game started: {name}"}, 200
+            data = api.payload
+            game_detector.set_current_game(
+                process=data["process"],
+                name=data["name"],
+                pid=data.get("pid"),
+            )
+            return {"message": f"Game started: {data['name']}"}, 200
 
     # ── /api/game/stop ────────────────────────────────────────────────────────
 

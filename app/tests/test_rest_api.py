@@ -187,6 +187,16 @@ def test_game_start_empty_process_returns_400(client):
     assert resp.status_code == 400
 
 
+def test_game_start_whitespace_only_process_returns_400(client):
+    resp = client.post("/api/game/start", json={"process": "   ", "name": "Game"})
+    assert resp.status_code == 400
+
+
+def test_game_start_whitespace_only_name_returns_400(client):
+    resp = client.post("/api/game/start", json={"process": "game.exe", "name": "   "})
+    assert resp.status_code == 400
+
+
 # ── POST /api/game/stop ───────────────────────────────────────────────────────
 
 
