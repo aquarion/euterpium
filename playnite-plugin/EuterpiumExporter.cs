@@ -122,40 +122,33 @@ namespace EuterpiumExporter
         {
             try
             {
-                using (var content = new StringContent(json, Encoding.UTF8, "application/json"))
-                using (var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = content })
+                var status = SendPost(path, json);
+                if (status == System.Net.HttpStatusCode.Unauthorized)
                 {
-                    var currentKey = _apiKey;
-                    if (!string.IsNullOrEmpty(currentKey))
-                        request.Headers.Authorization =
-                            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", currentKey);
+                    // Key may have been generated after Playnite loaded — refresh and retry once
+                    // so the triggering event (e.g. game start) is not silently dropped.
+                    _apiKey = ReadKeyFromConfig();
+                    status = SendPost(path, json);
+                }
 
-                    // Task.Run detaches from any ambient SynchronizationContext, avoiding
-                    // the deadlock that GetAwaiter().GetResult() can cause on .NET Framework.
-                    using (var response = Task.Run(() => _httpClient.SendAsync(request)).GetAwaiter().GetResult())
-                    {
-                        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                        {
-                            // Refresh key in case Euterpium generated it after Playnite started.
-                            _apiKey = ReadKeyFromConfig();
-                            OnApiFailure(
-                                $"EuterpiumExporter: API call to {path} returned 401 Unauthorized — " +
-                                "check that [rest_api] key in euterpium.ini matches between the app and plugin",
-                                "Euterpium: bearer token mismatch — open euterpium.ini and check [rest_api] key"
-                            );
-                        }
-                        else if (!response.IsSuccessStatusCode)
-                        {
-                            OnApiFailure(
-                                $"EuterpiumExporter: API call to {path} returned {(int)response.StatusCode}",
-                                $"Euterpium: unexpected response {(int)response.StatusCode} from local API"
-                            );
-                        }
-                        else
-                        {
-                            OnApiSuccess();
-                        }
-                    }
+                if (status == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    OnApiFailure(
+                        $"EuterpiumExporter: API call to {path} returned 401 Unauthorized — " +
+                        "check that [rest_api] key in euterpium.ini matches between the app and plugin",
+                        "Euterpium: bearer token mismatch — open euterpium.ini and check [rest_api] key"
+                    );
+                }
+                else if ((int)status < 200 || (int)status >= 300)
+                {
+                    OnApiFailure(
+                        $"EuterpiumExporter: API call to {path} returned {(int)status}",
+                        $"Euterpium: unexpected response {(int)status} from local API"
+                    );
+                }
+                else
+                {
+                    OnApiSuccess();
                 }
             }
             catch (Exception ex)
@@ -164,6 +157,26 @@ namespace EuterpiumExporter
                     $"EuterpiumExporter: API call to {path} failed: {ex.Message}",
                     "Euterpium: could not reach local API — is Euterpium running?"
                 );
+            }
+        }
+
+        /// <summary>
+        /// Sends a single POST and returns the HTTP status code.
+        /// Creates fresh content/request objects each call so it is safe to call twice.
+        /// </summary>
+        private System.Net.HttpStatusCode SendPost(string path, string json)
+        {
+            // Task.Run detaches from any ambient SynchronizationContext, avoiding
+            // the deadlock that GetAwaiter().GetResult() can cause on .NET Framework.
+            using (var content = new StringContent(json, Encoding.UTF8, "application/json"))
+            using (var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = content })
+            {
+                var currentKey = _apiKey;
+                if (!string.IsNullOrEmpty(currentKey))
+                    request.Headers.Authorization =
+                        new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", currentKey);
+                using (var response = Task.Run(() => _httpClient.SendAsync(request)).GetAwaiter().GetResult())
+                    return response.StatusCode;
             }
         }
 

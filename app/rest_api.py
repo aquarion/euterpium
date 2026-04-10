@@ -175,10 +175,13 @@ def create_app(tracker) -> Flask:
         )
         def post(self):
             data = api.payload
+            pid = data.get("pid")
+            if pid is not None and pid < 1:
+                pid = None
             game_detector.set_current_game(
                 process=data["process"],
                 name=data["name"],
-                pid=data.get("pid"),
+                pid=pid,
             )
             return {"message": f"Game started: {data['name']}"}, 200
 

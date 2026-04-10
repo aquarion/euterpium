@@ -261,7 +261,9 @@ def get_rest_api_port() -> int:
 def get_rest_api_key() -> str:
     """Return the REST API bearer token, generating and persisting one if absent.
 
-    Returns an empty string only if the config directory is unavailable.
+    If the config directory is unavailable, returns an ephemeral per-run key so auth
+    is always enforced. The Playnite plugin will not be able to connect in that session
+    (it also reads the key from the same config file).
     """
     import secrets
 
@@ -269,8 +271,12 @@ def get_rest_api_key() -> str:
     if key:
         return key
     if _CONFIG_UNAVAILABLE:
-        logger.warning("Config unavailable — REST API will start without auth")
-        return ""
+        ephemeral = secrets.token_urlsafe(32)
+        logger.warning(
+            "Config unavailable — REST API will use an ephemeral key for this run; "
+            "Playnite plugin integration will not work until config is accessible"
+        )
+        return ephemeral
     new_key = secrets.token_urlsafe(32)
     save({"rest_api": {"key": new_key}})
     logger.info("Generated REST API bearer token and saved to config")
