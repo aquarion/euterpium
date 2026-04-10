@@ -33,6 +33,11 @@ namespace EuterpiumExporter
         private static readonly string _apiKey = ReadKeyFromConfig();
         private static readonly HttpClient _httpClient = CreateHttpClient();
 
+        // Tracks whether the last API call succeeded so we only notify on the first failure
+        // and clear the notification when connectivity is restored.
+        private const string NotificationId = "euterpium-api-error";
+        private volatile bool _apiReachable = true;
+
         public override Guid Id { get; } = Guid.Parse("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
 
         public EuterpiumExporter(IPlayniteAPI api) : base(api) { }
@@ -100,20 +105,53 @@ namespace EuterpiumExporter
                 var response = Task.Run(() => _httpClient.PostAsync(path, content)).GetAwaiter().GetResult();
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 {
-                    logger.Warn(
+                    OnApiFailure(
                         $"EuterpiumExporter: API call to {path} returned 401 Unauthorized — " +
-                        "check that [rest_api] key in euterpium.ini matches between the app and plugin"
+                        "check that [rest_api] key in euterpium.ini matches between the app and plugin",
+                        "Euterpium: bearer token mismatch — open euterpium.ini and check [rest_api] key"
                     );
                 }
                 else if (!response.IsSuccessStatusCode)
                 {
-                    logger.Warn($"EuterpiumExporter: API call to {path} returned {(int)response.StatusCode}");
+                    OnApiFailure(
+                        $"EuterpiumExporter: API call to {path} returned {(int)response.StatusCode}",
+                        $"Euterpium: unexpected response {(int)response.StatusCode} from local API"
+                    );
+                }
+                else
+                {
+                    OnApiSuccess();
                 }
             }
             catch (Exception ex)
             {
-                logger.Warn($"EuterpiumExporter: API call to {path} failed: {ex.Message}");
+                OnApiFailure(
+                    $"EuterpiumExporter: API call to {path} failed: {ex.Message}",
+                    "Euterpium: could not reach local API — is Euterpium running?"
+                );
             }
+        }
+
+        private void OnApiSuccess()
+        {
+            if (_apiReachable)
+                return;
+            _apiReachable = true;
+            PlayniteApi.Notifications.Remove(NotificationId);
+            logger.Info("EuterpiumExporter: API connection restored");
+        }
+
+        private void OnApiFailure(string logMessage, string notificationMessage)
+        {
+            logger.Warn(logMessage);
+            if (!_apiReachable)
+                return;
+            _apiReachable = false;
+            PlayniteApi.Notifications.Add(new NotificationMessage(
+                NotificationId,
+                notificationMessage,
+                NotificationType.Error
+            ));
         }
 
         // Fallback exe resolution when Playnite doesn't provide a process ID.
