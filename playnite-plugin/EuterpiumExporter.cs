@@ -35,8 +35,10 @@ namespace EuterpiumExporter
 
         // Tracks whether the last API call succeeded so we only notify on the first failure
         // and clear the notification when connectivity is restored.
+        // _lastNotificationMessage lets us update the notification if the failure reason changes.
         private const string NotificationId = "euterpium-api-error";
         private volatile bool _apiReachable = true;
+        private volatile string _lastNotificationMessage = null;
 
         public override Guid Id { get; } = Guid.Parse("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
 
@@ -137,6 +139,7 @@ namespace EuterpiumExporter
             if (_apiReachable)
                 return;
             _apiReachable = true;
+            _lastNotificationMessage = null;
             PlayniteApi.Notifications.Remove(NotificationId);
             logger.Info("EuterpiumExporter: API connection restored");
         }
@@ -144,9 +147,10 @@ namespace EuterpiumExporter
         private void OnApiFailure(string logMessage, string notificationMessage)
         {
             logger.Warn(logMessage);
-            if (!_apiReachable)
+            if (!_apiReachable && notificationMessage == _lastNotificationMessage)
                 return;
             _apiReachable = false;
+            _lastNotificationMessage = notificationMessage;
             PlayniteApi.Notifications.Add(new NotificationMessage(
                 NotificationId,
                 notificationMessage,
