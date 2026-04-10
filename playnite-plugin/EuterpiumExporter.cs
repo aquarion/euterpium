@@ -98,7 +98,14 @@ namespace EuterpiumExporter
                 // Task.Run detaches from any ambient SynchronizationContext, avoiding
                 // the deadlock that GetAwaiter().GetResult() can cause on .NET Framework.
                 var response = Task.Run(() => _httpClient.PostAsync(path, content)).GetAwaiter().GetResult();
-                if (!response.IsSuccessStatusCode)
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    logger.Warn(
+                        $"EuterpiumExporter: API call to {path} returned 401 Unauthorized — " +
+                        "check that [rest_api] key in euterpium.ini matches between the app and plugin"
+                    );
+                }
+                else if (!response.IsSuccessStatusCode)
                 {
                     logger.Warn($"EuterpiumExporter: API call to {path} returned {(int)response.StatusCode}");
                 }
