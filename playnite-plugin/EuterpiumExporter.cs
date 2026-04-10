@@ -27,14 +27,11 @@ namespace EuterpiumExporter
             "steam_", "easyanticheat", "eac_launcher", "battleye", "be_service",
         };
 
-        // Resolved once at startup from euterpium.ini so the port follows the app config.
+        // Resolved once at startup from euterpium.ini so port and auth key follow the app config.
+        // Changes to euterpium.ini require restarting Playnite to take effect.
         private static readonly string _apiBaseUrl = BuildApiBaseUrl();
-
-        private static readonly HttpClient _httpClient = new HttpClient
-        {
-            BaseAddress = new Uri(_apiBaseUrl),
-            Timeout = TimeSpan.FromSeconds(2),
-        };
+        private static readonly string _apiKey = ReadKeyFromConfig();
+        private static readonly HttpClient _httpClient = CreateHttpClient();
 
         public override Guid Id { get; } = Guid.Parse("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
 
@@ -180,10 +177,33 @@ namespace EuterpiumExporter
             return _nonGameExePatterns.Any(p => lower.Contains(p));
         }
 
+        private static HttpClient CreateHttpClient()
+        {
+            var client = new HttpClient
+            {
+                BaseAddress = new Uri(_apiBaseUrl),
+                Timeout = TimeSpan.FromSeconds(2),
+            };
+            if (!string.IsNullOrEmpty(_apiKey))
+                client.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
+            return client;
+        }
+
         private static string BuildApiBaseUrl()
         {
             int port = ReadPortFromConfig();
             return $"http://127.0.0.1:{port}";
+        }
+
+        /// <summary>
+        /// Reads the [rest_api] key from euterpium.ini. Returns an empty string
+        /// if the file is absent or the key has not been generated yet (in which
+        /// case the server will also have no auth configured).
+        /// </summary>
+        private static string ReadKeyFromConfig()
+        {
+            return ReadIniValue("rest_api", "key", string.Empty);
         }
 
         /// <summary>
@@ -193,7 +213,19 @@ namespace EuterpiumExporter
         /// </summary>
         private static int ReadPortFromConfig()
         {
-            const int defaultPort = 43174;
+            var raw = ReadIniValue("rest_api", "port", "43174");
+            if (int.TryParse(raw, out int port) && port >= 1024 && port <= 65535)
+                return port;
+            return 43174;
+        }
+
+        /// <summary>
+        /// Reads a single key from a section of euterpium.ini
+        /// (%LOCALAPPDATA%\euterpium\euterpium.ini). Returns <paramref name="fallback"/>
+        /// if the file, section, or key is absent, or on any read error.
+        /// </summary>
+        private static string ReadIniValue(string section, string key, string fallback)
+        {
             try
             {
                 var configPath = Path.Combine(
@@ -203,20 +235,21 @@ namespace EuterpiumExporter
                 );
 
                 if (!File.Exists(configPath))
-                    return defaultPort;
+                    return fallback;
 
+                var sectionHeader = $"[{section}]";
                 bool inSection = false;
                 foreach (var line in File.ReadLines(configPath))
                 {
                     var trimmed = line.Trim();
                     if (trimmed.StartsWith("["))
                     {
-                        inSection = trimmed.Equals("[rest_api]", StringComparison.OrdinalIgnoreCase);
+                        inSection = trimmed.Equals(sectionHeader, StringComparison.OrdinalIgnoreCase);
                         continue;
                     }
                     if (!inSection)
                         continue;
-                    if (!trimmed.StartsWith("port", StringComparison.OrdinalIgnoreCase))
+                    if (!trimmed.StartsWith(key, StringComparison.OrdinalIgnoreCase))
                         continue;
 
                     var eqIdx = trimmed.IndexOf('=');
@@ -229,15 +262,14 @@ namespace EuterpiumExporter
                     if (commentIdx >= 0)
                         value = value.Substring(0, commentIdx).Trim();
 
-                    if (int.TryParse(value, out int port) && port >= 1024 && port <= 65535)
-                        return port;
+                    return value;
                 }
             }
             catch
             {
-                // Fall through to default — log not available in static context
+                // Fall through to fallback — logger not available in static context
             }
-            return defaultPort;
+            return fallback;
         }
     }
 }

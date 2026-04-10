@@ -1,11 +1,15 @@
 # tests/test_rest_api.py — REST API endpoint tests
 
+import threading
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+import config
 import game_detector
 from rest_api import create_app
+
+_TEST_KEY = "not-a-real-key"  # noqa: S105 — not a secret, just a test fixture value
 
 
 @pytest.fixture(autouse=True)
@@ -16,10 +20,19 @@ def reset_api_game():
     game_detector.clear_current_game()
 
 
+@pytest.fixture(autouse=True)
+def no_auth(monkeypatch):
+    """Disable bearer-token auth for all tests that don't specifically test it."""
+    monkeypatch.setattr(config, "get_rest_api_key", lambda: "")
+
+
 def _make_tracker(is_running=True, last_track=None):
     tracker = MagicMock()
     tracker.is_running = is_running
     tracker.last_track = last_track
+    # Use a real Lock so the context manager in _build_now_playing_payload behaves
+    # correctly — MagicMock.__exit__ is truthy and would suppress exceptions.
+    tracker._last_track_lock = threading.Lock()
     return tracker
 
 
@@ -119,21 +132,21 @@ def test_now_playing_no_game_in_payload():
 
 
 def test_fingerprint_now_triggers_force_fingerprint(client):
+    resp = client.post("/api/fingerprint/now")
+    assert resp.status_code == 202
+
+
+def test_fingerprint_now_calls_tracker(client):
     tracker = _make_tracker()
     app = create_app(tracker)
     app.config["TESTING"] = True
     with app.test_client() as c:
-        resp = c.post("/api/fingerprint/now")
-    assert resp.status_code == 202
+        c.post("/api/fingerprint/now")
     tracker.force_fingerprint.assert_called_once()
 
 
-def test_fingerprint_now_returns_message():
-    tracker = _make_tracker()
-    app = create_app(tracker)
-    app.config["TESTING"] = True
-    with app.test_client() as c:
-        data = c.post("/api/fingerprint/now").get_json()
+def test_fingerprint_now_returns_message(client):
+    data = client.post("/api/fingerprint/now").get_json()
     assert "message" in data
 
 
@@ -238,3 +251,51 @@ def test_swagger_json_available(client):
     assert any("fingerprint" in p for p in paths)
     assert any("/game/start" in p for p in paths)
     assert any("/game/stop" in p for p in paths)
+
+
+# ── Bearer auth ───────────────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def authed_client(monkeypatch):
+    """Test client with bearer auth enabled, returns (client, key)."""
+    monkeypatch.setattr(config, "get_rest_api_key", lambda: _TEST_KEY)
+    app = create_app(_make_tracker())
+    app.config["TESTING"] = True
+    with app.test_client() as c:
+        yield c, _TEST_KEY
+
+
+def test_auth_missing_header_returns_401(authed_client):
+    client, _ = authed_client
+    assert client.get("/api/status").status_code == 401
+
+
+def test_auth_wrong_token_returns_401(authed_client):
+    client, _ = authed_client
+    resp = client.get("/api/status", headers={"Authorization": "Bearer wrong-token"})
+    assert resp.status_code == 401
+
+
+def test_auth_correct_token_grants_access(authed_client):
+    client, key = authed_client
+    resp = client.get("/api/status", headers={"Authorization": f"Bearer {key}"})
+    assert resp.status_code == 200
+
+
+def test_auth_swagger_ui_exempt(authed_client):
+    """Swagger UI must be reachable without auth so users can discover the token."""
+    client, _ = authed_client
+    assert client.get("/api/").status_code == 200
+
+
+def test_auth_swagger_json_exempt(authed_client):
+    client, _ = authed_client
+    assert client.get("/api/swagger.json").status_code == 200
+
+
+def test_auth_post_endpoint_requires_token(authed_client):
+    client, key = authed_client
+    assert client.post("/api/fingerprint/now").status_code == 401
+    resp = client.post("/api/fingerprint/now", headers={"Authorization": f"Bearer {key}"})
+    assert resp.status_code == 202

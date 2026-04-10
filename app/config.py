@@ -254,6 +254,25 @@ def get_rest_api_port() -> int:
     return _getint(_cfg(), "rest_api", "port", 43174)
 
 
+def get_rest_api_key() -> str:
+    """Return the REST API bearer token, generating and persisting one if absent.
+
+    Returns an empty string only if the config directory is unavailable.
+    """
+    import secrets
+
+    key = _cfg().get("rest_api", "key", fallback="").strip()
+    if key:
+        return key
+    if _CONFIG_UNAVAILABLE:
+        logger.warning("Config unavailable — REST API will start without auth")
+        return ""
+    new_key = secrets.token_urlsafe(32)
+    save({"rest_api": {"key": new_key}})
+    logger.info("Generated REST API bearer token and saved to config")
+    return new_key
+
+
 # ── Write helper ──────────────────────────────────────────────────────────────
 
 

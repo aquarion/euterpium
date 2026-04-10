@@ -7,6 +7,7 @@ import logging
 import threading
 
 from flask import Blueprint, Flask
+from flask import request as flask_request
 from flask_restx import Api, Namespace, Resource, fields
 
 import config
@@ -33,8 +34,36 @@ def _build_now_playing_payload(tracker) -> dict | None:
 
 def create_app(tracker) -> Flask:
     """Create and configure the Flask application with the REST API."""
+    api_key = config.get_rest_api_key()
+
     app = Flask(__name__)
     app.config["RESTX_MASK_SWAGGER"] = False
+
+    # ── Bearer-token auth ─────────────────────────────────────────────────────
+
+    _SWAGGER_PREFIXES = ("/api/swagger", "/api/swaggerui")
+
+    @app.before_request
+    def _check_auth():
+        if not api_key:
+            return None
+        if flask_request.path == "/api/" or flask_request.path.startswith(_SWAGGER_PREFIXES):
+            return None
+        if flask_request.headers.get("Authorization") == f"Bearer {api_key}":
+            return None
+        return {"message": "Unauthorized"}, 401
+
+    # ── Flask-RESTX setup ─────────────────────────────────────────────────────
+
+    _authorizations = {
+        "Bearer": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "Authorization",
+            "description": "Enter: <b>Bearer &lt;token&gt;</b> — token is the "
+            "<code>key</code> value in <code>[rest_api]</code> in euterpium.ini",
+        }
+    }
 
     blueprint = Blueprint("api", __name__, url_prefix="/api")
     api = Api(
@@ -43,6 +72,8 @@ def create_app(tracker) -> Flask:
         title="Euterpium API",
         description="Local REST interface for Euterpium music fingerprinting.",
         doc="/",
+        authorizations=_authorizations,
+        security="Bearer" if api_key else None,
     )
 
     # ── Models ────────────────────────────────────────────────────────────────
