@@ -10,8 +10,9 @@ repos:
     rev: 2.3.3
     hooks:
       - id: poetry-check
+        args: [--directory, app, --lock]
       - id: poetry-lock
-        args: [--check]
+        args: [--directory, app]
 
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
