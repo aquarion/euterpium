@@ -1,15 +1,12 @@
 name: "[Auto] Merge Dependabot Updates"
 
 on:
-  workflow_run:
-    workflows: ["[Tests] Acceptance Testing"]
-    types:
-      - completed
-    branches-ignore:
-      - 'main'
+  pull_request_target:
+    types: [opened, synchronize, reopened]
 
 jobs:
   automerge:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
     uses: istic/shared-workflows/.github/workflows/auto-merge-dependabot.yml@main
     permissions:
       pull-requests: write
