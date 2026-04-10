@@ -47,7 +47,9 @@ def create_app(tracker) -> Flask:
     def _check_auth():
         if not api_key:
             return None
-        if flask_request.path == "/api/" or flask_request.path.startswith(_SWAGGER_PREFIXES):
+        if flask_request.path in ("/api/", "/api") or flask_request.path.startswith(
+            _SWAGGER_PREFIXES
+        ):
             return None
         if flask_request.headers.get("Authorization") == f"Bearer {api_key}":
             return None
@@ -169,7 +171,7 @@ def create_app(tracker) -> Flask:
         @ns_game.expect(game_input, validate=True)
         @ns_game.marshal_with(message_model, code=200)
         @ns_game.doc(
-            description="Notify Euterpium that a game has started. Begins game-audio fingerprinting."
+            description="Notify Euterpium that a game has started. Begins game-audio fingerprinting.",
         )
         def post(self):
             data = api.payload

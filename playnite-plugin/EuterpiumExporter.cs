@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Playnite.SDK;
 using Playnite.SDK.Events;
@@ -28,9 +29,10 @@ namespace EuterpiumExporter
         };
 
         // Resolved once at startup from euterpium.ini so port and auth key follow the app config.
-        // Changes to euterpium.ini require restarting Playnite to take effect.
+        // _apiKey is volatile so it can be refreshed on 401 (e.g. if Playnite started before
+        // Euterpium's first run, when no key exists yet). Port changes require a Playnite restart.
         private static readonly string _apiBaseUrl = BuildApiBaseUrl();
-        private static readonly string _apiKey = ReadKeyFromConfig();
+        private static volatile string _apiKey = ReadKeyFromConfig();
         private static readonly HttpClient _httpClient = CreateHttpClient();
 
         // Tracks whether the last API call succeeded so we only notify on the first failure
@@ -47,6 +49,25 @@ namespace EuterpiumExporter
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
             logger.Info($"EuterpiumExporter: ready — API at {_apiBaseUrl}/api/");
+
+            // Remove legacy file written by the old file-based integration (pre-REST API).
+            try
+            {
+                var legacyPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "Playnite",
+                    "euterpium_current_game.json"
+                );
+                if (File.Exists(legacyPath))
+                {
+                    File.Delete(legacyPath);
+                    logger.Info("EuterpiumExporter: removed legacy euterpium_current_game.json");
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Warn($"EuterpiumExporter: could not remove legacy game file: {ex.Message}");
+            }
         }
 
         public override void OnGameStarted(OnGameStartedEventArgs args)
@@ -101,28 +122,40 @@ namespace EuterpiumExporter
         {
             try
             {
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-                // Task.Run detaches from any ambient SynchronizationContext, avoiding
-                // the deadlock that GetAwaiter().GetResult() can cause on .NET Framework.
-                var response = Task.Run(() => _httpClient.PostAsync(path, content)).GetAwaiter().GetResult();
-                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                using (var content = new StringContent(json, Encoding.UTF8, "application/json"))
+                using (var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = content })
                 {
-                    OnApiFailure(
-                        $"EuterpiumExporter: API call to {path} returned 401 Unauthorized — " +
-                        "check that [rest_api] key in euterpium.ini matches between the app and plugin",
-                        "Euterpium: bearer token mismatch — open euterpium.ini and check [rest_api] key"
-                    );
-                }
-                else if (!response.IsSuccessStatusCode)
-                {
-                    OnApiFailure(
-                        $"EuterpiumExporter: API call to {path} returned {(int)response.StatusCode}",
-                        $"Euterpium: unexpected response {(int)response.StatusCode} from local API"
-                    );
-                }
-                else
-                {
-                    OnApiSuccess();
+                    var currentKey = _apiKey;
+                    if (!string.IsNullOrEmpty(currentKey))
+                        request.Headers.Authorization =
+                            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", currentKey);
+
+                    // Task.Run detaches from any ambient SynchronizationContext, avoiding
+                    // the deadlock that GetAwaiter().GetResult() can cause on .NET Framework.
+                    using (var response = Task.Run(() => _httpClient.SendAsync(request)).GetAwaiter().GetResult())
+                    {
+                        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                        {
+                            // Refresh key in case Euterpium generated it after Playnite started.
+                            _apiKey = ReadKeyFromConfig();
+                            OnApiFailure(
+                                $"EuterpiumExporter: API call to {path} returned 401 Unauthorized — " +
+                                "check that [rest_api] key in euterpium.ini matches between the app and plugin",
+                                "Euterpium: bearer token mismatch — open euterpium.ini and check [rest_api] key"
+                            );
+                        }
+                        else if (!response.IsSuccessStatusCode)
+                        {
+                            OnApiFailure(
+                                $"EuterpiumExporter: API call to {path} returned {(int)response.StatusCode}",
+                                $"Euterpium: unexpected response {(int)response.StatusCode} from local API"
+                            );
+                        }
+                        else
+                        {
+                            OnApiSuccess();
+                        }
+                    }
                 }
             }
             catch (Exception ex)
@@ -228,15 +261,11 @@ namespace EuterpiumExporter
 
         private static HttpClient CreateHttpClient()
         {
-            var client = new HttpClient
+            return new HttpClient
             {
                 BaseAddress = new Uri(_apiBaseUrl),
                 Timeout = TimeSpan.FromSeconds(2),
             };
-            if (!string.IsNullOrEmpty(_apiKey))
-                client.DefaultRequestHeaders.Authorization =
-                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
-            return client;
         }
 
         private static string BuildApiBaseUrl()
@@ -246,9 +275,10 @@ namespace EuterpiumExporter
         }
 
         /// <summary>
-        /// Reads the [rest_api] key from euterpium.ini. Returns an empty string
-        /// if the file is absent or the key has not been generated yet (in which
-        /// case the server will also have no auth configured).
+        /// Reads the [rest_api] key from euterpium.ini. Returns an empty string if
+        /// the file is absent or the key has not been generated yet. The server
+        /// auto-generates a key on first run; if Playnite started before that first
+        /// run, subsequent 401 responses will trigger a refresh via <see cref="_apiKey"/>.
         /// </summary>
         private static string ReadKeyFromConfig()
         {
@@ -298,11 +328,15 @@ namespace EuterpiumExporter
                     }
                     if (!inSection)
                         continue;
-                    if (!trimmed.StartsWith(key, StringComparison.OrdinalIgnoreCase))
+                    if (trimmed.StartsWith(";") || trimmed.StartsWith("#"))
                         continue;
 
                     var eqIdx = trimmed.IndexOf('=');
                     if (eqIdx < 0)
+                        continue;
+
+                    var parsedKey = trimmed.Substring(0, eqIdx).Trim();
+                    if (!parsedKey.Equals(key, StringComparison.OrdinalIgnoreCase))
                         continue;
 
                     var value = trimmed.Substring(eqIdx + 1).Trim();

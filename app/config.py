@@ -251,7 +251,11 @@ def get_rest_api_enabled() -> bool:
 
 
 def get_rest_api_port() -> int:
-    return _getint(_cfg(), "rest_api", "port", 43174)
+    port = _getint(_cfg(), "rest_api", "port", 43174)
+    if port < 1024 or port > 65535:
+        logger.warning("REST API port %d is out of range (1024–65535) — using default 43174", port)
+        return 43174
+    return port
 
 
 def get_rest_api_key() -> str:
