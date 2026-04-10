@@ -1,6 +1,7 @@
 # tests/test_audio.py — audio_to_wav_bytes, compute_rms, AudioChangeDetector logic
 
 import io
+import sys
 import wave
 
 import numpy as np
@@ -242,7 +243,7 @@ def test_get_loopback_device_returns_device(monkeypatch):
             return FakeLoopback()
 
     fake_sc = FakeSC()
-    monkeypatch.setitem(__import__("sys").modules, "soundcard", fake_sc)
+    monkeypatch.setitem(sys.modules, "soundcard", fake_sc)
     result = audio_capture.get_loopback_device()
     assert isinstance(result, FakeLoopback)
 
@@ -254,7 +255,7 @@ def test_get_loopback_device_returns_none_on_error(monkeypatch):
         def default_speaker(self):
             raise OSError("no audio device")
 
-    monkeypatch.setitem(__import__("sys").modules, "soundcard", BrokenSC())
+    monkeypatch.setitem(sys.modules, "soundcard", BrokenSC())
     result = audio_capture.get_loopback_device()
     assert result is None
 
