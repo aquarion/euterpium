@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
+using System.Net.Http;
+using System.Text;
 using Newtonsoft.Json;
 using Playnite.SDK;
 using Playnite.SDK.Events;
@@ -25,11 +26,11 @@ namespace EuterpiumExporter
             "steam_", "easyanticheat", "eac_launcher", "battleye", "be_service",
         };
 
-        private readonly string _currentGamePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Playnite",
-            "euterpium_current_game.json"
-        );
+        private static readonly HttpClient _httpClient = new HttpClient
+        {
+            BaseAddress = new Uri("http://127.0.0.1:43174"),
+            Timeout = TimeSpan.FromSeconds(2),
+        };
 
         public override Guid Id { get; } = Guid.Parse("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
 
@@ -37,8 +38,6 @@ namespace EuterpiumExporter
 
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
-            // Clear any stale file left by a previous crash
-            TryDeleteCurrentGameFile("startup");
             logger.Info("EuterpiumExporter: ready");
         }
 
@@ -72,74 +71,37 @@ namespace EuterpiumExporter
                 return;
             }
 
-            var entry = new CurrentGameEntry
+            var payload = JsonConvert.SerializeObject(new
             {
-                Process = exeName,
-                Name = game.Name,
-                Pid = args.StartedProcessId,
-            };
+                process = exeName,
+                name = game.Name,
+                pid = args.StartedProcessId > 0 ? (int?)args.StartedProcessId : null,
+            });
 
-            var currentGameJson = JsonConvert.SerializeObject(entry, Formatting.Indented);
-            WriteCurrentGameFileAtomically(currentGameJson);
+            PostToEuterpiumApi("/api/game/start", payload);
             logger.Info($"EuterpiumExporter: game started — {game.Name} ({exeName})");
-        }
-
-        private void WriteCurrentGameFileAtomically(string contents)
-        {
-            var directory = Path.GetDirectoryName(_currentGamePath);
-            if (!string.IsNullOrEmpty(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            var tempPath = Path.Combine(
-                directory ?? string.Empty,
-                Path.GetFileName(_currentGamePath) + "." + Guid.NewGuid().ToString("N") + ".tmp"
-            );
-
-            try
-            {
-                File.WriteAllText(tempPath, contents);
-
-                if (File.Exists(_currentGamePath))
-                {
-                    File.Replace(tempPath, _currentGamePath, null);
-                }
-                else
-                {
-                    File.Move(tempPath, _currentGamePath);
-                }
-            }
-            catch
-            {
-                if (File.Exists(tempPath))
-                {
-                    File.Delete(tempPath);
-                }
-
-                throw;
-            }
         }
 
         public override void OnGameStopped(OnGameStoppedEventArgs args)
         {
-            TryDeleteCurrentGameFile($"game stopped — {args.Game.Name}");
+            PostToEuterpiumApi("/api/game/stop", "{}");
             logger.Info($"EuterpiumExporter: game stopped — {args.Game.Name}");
         }
 
-        private void TryDeleteCurrentGameFile(string context)
+        private void PostToEuterpiumApi(string path, string json)
         {
-            if (!File.Exists(_currentGamePath))
-                return;
-
             try
             {
-                File.Delete(_currentGamePath);
-                logger.Info($"EuterpiumExporter: current game file deleted ({context})");
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                var response = _httpClient.PostAsync(path, content).GetAwaiter().GetResult();
+                if (!response.IsSuccessStatusCode)
+                {
+                    logger.Warn($"EuterpiumExporter: API call to {path} returned {(int)response.StatusCode}");
+                }
             }
             catch (Exception ex)
             {
-                logger.Warn($"EuterpiumExporter: failed to delete current game file ({context}): {ex.Message}");
+                logger.Warn($"EuterpiumExporter: API call to {path} failed: {ex.Message}");
             }
         }
 
@@ -158,21 +120,21 @@ namespace EuterpiumExporter
                     if (string.IsNullOrWhiteSpace(resolved))
                         continue;
 
-                    var exe = Path.GetFileName(resolved);
+                    var exe = System.IO.Path.GetFileName(resolved);
                     if (!string.IsNullOrWhiteSpace(exe))
                         return exe;
                 }
             }
 
             if (string.IsNullOrWhiteSpace(game.InstallDirectory) ||
-                !Directory.Exists(game.InstallDirectory))
+                !System.IO.Directory.Exists(game.InstallDirectory))
                 return null;
 
             try
             {
-                var candidates = Directory
-                    .GetFiles(game.InstallDirectory, "*.exe", SearchOption.TopDirectoryOnly)
-                    .Select(Path.GetFileName)
+                var candidates = System.IO.Directory
+                    .GetFiles(game.InstallDirectory, "*.exe", System.IO.SearchOption.TopDirectoryOnly)
+                    .Select(System.IO.Path.GetFileName)
                     .Where(f => !IsNonGameExe(f))
                     .ToList();
 
@@ -189,7 +151,7 @@ namespace EuterpiumExporter
                     return candidates.FirstOrDefault(f =>
                     {
                         var nameSlug = new string(
-                            Path.GetFileNameWithoutExtension(f)
+                            System.IO.Path.GetFileNameWithoutExtension(f)
                                 .ToLowerInvariant()
                                 .Where(char.IsLetterOrDigit)
                                 .ToArray());
@@ -211,16 +173,5 @@ namespace EuterpiumExporter
             return _nonGameExePatterns.Any(p => lower.Contains(p));
         }
     }
-
-    internal class CurrentGameEntry
-    {
-        [JsonProperty("process")]
-        public string Process { get; set; }
-
-        [JsonProperty("name")]
-        public string Name { get; set; }
-
-        [JsonProperty("pid")]
-        public int? Pid { get; set; }
-    }
 }
+

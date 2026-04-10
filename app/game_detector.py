@@ -2,6 +2,7 @@
 
 import json
 import logging
+import threading
 
 import psutil
 
@@ -11,6 +12,31 @@ from config import KNOWN_GAMES
 logger = logging.getLogger(__name__)
 
 _current_game_logged_missing = False
+
+# In-memory game state set via the REST API (takes priority over file detection)
+_api_current_game: dict | None = None
+_api_game_lock = threading.Lock()
+
+
+def set_current_game(process: str, name: str, pid: int | None = None) -> None:
+    """Set the current game from the REST API, replacing the file-based transport."""
+    global _api_current_game
+    entry: dict = {"process": process.strip().lower(), "display_name": name}
+    if pid is not None:
+        entry["pid"] = pid
+    with _api_game_lock:
+        _api_current_game = entry
+    logger.info("Game started (API): %s (%s)", name, process)
+
+
+def clear_current_game() -> None:
+    """Clear the current game set by the REST API."""
+    global _api_current_game
+    with _api_game_lock:
+        prev = _api_current_game
+        _api_current_game = None
+    if prev is not None:
+        logger.info("Game stopped (API): %s", prev.get("display_name", "?"))
 
 
 def _get_playnite_current_game() -> dict | None:
@@ -49,11 +75,21 @@ def get_running_game() -> dict | None:
     Returns the currently running game as a dict, or None.
 
     Checks in order:
-    1. Playnite event-driven file (euterpium_current_game.json) — covers all
-       games launched via Playnite regardless of platform.
-    2. Manual [games] entries from euterpium.ini — covers games launched
-       outside Playnite.
+    1. In-memory game set via the REST API (POST /api/game/start) — highest priority.
+    2. Playnite event-driven file (euterpium_current_game.json) — legacy file transport.
+    3. Manual [games] entries from euterpium.ini — covers games launched outside Playnite.
     """
+    with _api_game_lock:
+        api_game = _api_current_game
+
+    if api_game is not None:
+        pid = api_game.get("pid")
+        if pid is not None and not psutil.pid_exists(pid):
+            logger.debug("API current game has stale PID %d — clearing", pid)
+            clear_current_game()
+        else:
+            return {"process": api_game["process"], "display_name": api_game["display_name"]}
+
     game = _get_playnite_current_game()
     if game:
         return game
