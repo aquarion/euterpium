@@ -21,11 +21,28 @@ def tracker():
 
 @pytest.fixture
 def running_tracker():
+    """Tracker with background loop replaced by a no-op so tests don't touch live OS APIs."""
     tracker = Tracker(queue.Queue())
+    tracker._run = lambda: tracker._stop_event.wait()
     tracker.start()
     yield tracker
-    # Clean up - stop tracker
     tracker.stop()
+
+
+def _wait_for_manual_fingerprint(tracker, timeout=2.0):
+    """Wait for an in-progress manual fingerprint to finish, then drain the event queue."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        with tracker._last_track_lock:
+            if not tracker._manual_fingerprint_running:
+                break
+        time.sleep(0.005)
+    else:
+        pytest.fail("Manual fingerprint did not complete within timeout")
+    events = []
+    while not tracker.event_queue.empty():
+        events.append(tracker.event_queue.get_nowait())
+    return events
 
 
 # ── _tracks_are_same ──────────────────────────────────────────────────────────
@@ -127,15 +144,8 @@ def test_manual_fingerprint_requires_acrcloud_config(
     mock_host.return_value = None
     mock_is_configured.return_value = False
 
-    events = []
-
-    def capture_events():
-        while not running_tracker.event_queue.empty():
-            events.append(running_tracker.event_queue.get())
-
     running_tracker.force_fingerprint()
-    time.sleep(0.1)  # Let thread run
-    capture_events()
+    events = _wait_for_manual_fingerprint(running_tracker)
 
     # Should emit error about missing ACRCloud config
     error_events = [e for e in events if e[0] == "error"]
@@ -145,22 +155,16 @@ def test_manual_fingerprint_requires_acrcloud_config(
 
 @patch("tracker.config.get_acrcloud_host", return_value="host")
 @patch("tracker.config.acrcloud_is_configured", return_value=True)
-def test_manual_fingerprint_debouncing(mock_is_configured, mock_host, running_tracker):
+@patch("tracker.get_running_game", return_value=None)
+@patch("tracker.get_smtc_track_sync", return_value=None)
+def test_manual_fingerprint_debouncing(
+    mock_smtc, mock_game, mock_is_configured, mock_host, running_tracker
+):
     """Multiple rapid manual fingerprint calls should be debounced."""
-    events = []
-
-    def capture_events():
-        while not running_tracker.event_queue.empty():
-            events.append(running_tracker.event_queue.get())
-
-    # Start first fingerprint
+    # flag is set synchronously in force_fingerprint, so second call sees it immediately
     running_tracker.force_fingerprint()
-    time.sleep(0.01)  # Small delay
-
-    # Try to start second fingerprint (should be debounced)
     running_tracker.force_fingerprint()
-    time.sleep(0.1)  # Let threads finish
-    capture_events()
+    events = _wait_for_manual_fingerprint(running_tracker)
 
     # Should only see one "Manual fingerprinting requested" message
     status_events = [
@@ -180,15 +184,8 @@ def test_manual_fingerprint_smtc_fallback(
     mock_game.return_value = None  # No game running
     mock_smtc.return_value = {"title": "SMTC Track", "source": "smtc"}
 
-    events = []
-
-    def capture_events():
-        while not running_tracker.event_queue.empty():
-            events.append(running_tracker.event_queue.get())
-
     running_tracker.force_fingerprint()
-    time.sleep(0.1)  # Let thread run
-    capture_events()
+    events = _wait_for_manual_fingerprint(running_tracker)
 
     # Should emit status about checking SMTC
     status_events = [e for e in events if e[0] == "status"]
@@ -212,15 +209,8 @@ def test_manual_fingerprint_ignored_smtc_source_emits_debug_not_track(
         "artist": "Artist",
     }
 
-    events = []
-
-    def capture_events():
-        while not running_tracker.event_queue.empty():
-            events.append(running_tracker.event_queue.get())
-
     running_tracker.force_fingerprint()
-    time.sleep(0.1)
-    capture_events()
+    events = _wait_for_manual_fingerprint(running_tracker)
 
     assert not any(e[0] == "track" for e in events)
     assert any(e[0] == "status" and "Ignored source (firefox.exe)" in e[1] for e in events)
@@ -238,15 +228,8 @@ def test_manual_fingerprint_audio_capture_failure(
     mock_game.return_value = {"display_name": "Test Game", "name": "test"}
     mock_capture.return_value = None  # Audio capture fails
 
-    events = []
-
-    def capture_events():
-        while not running_tracker.event_queue.empty():
-            events.append(running_tracker.event_queue.get())
-
     running_tracker.force_fingerprint()
-    time.sleep(0.1)  # Let thread run
-    capture_events()
+    events = _wait_for_manual_fingerprint(running_tracker)
 
     # Should emit error about failed audio capture
     error_events = [e for e in events if e[0] == "error"]
