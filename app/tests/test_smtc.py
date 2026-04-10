@@ -3,14 +3,18 @@
 # app_resolver tests were moved here historically; they live in test_app_resolver.py.
 # This file covers smtc.get_smtc_track (async) and get_smtc_track_sync.
 #
-# winsdk is available on Windows — we patch MediaManager and MediaPlaybackStatus
-# at the smtc module level rather than at import time.
+# winsdk is Windows-only — these tests are skipped on other platforms.
 
 import asyncio
+import sys
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 import smtc as smtc_module
 from smtc import get_smtc_track, get_smtc_track_sync
+
+pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="winsdk is Windows-only")
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
