@@ -18,6 +18,7 @@ A Windows background app that detects currently playing music and posts now-play
 ## Setup
 
 ```
+cd app
 poetry install
 poetry run python main.py
 ```
@@ -36,18 +37,18 @@ Config is stored at `%LOCALAPPDATA%\euterpium\euterpium.ini`.
 
 | File | Purpose |
 |------|---------|
-| `main.py` | Entry point — wires tracker, tray, window together |
-| `tracker.py` | Background detection loop |
-| `smtc.py` | Windows Media Session (SMTC) detection via winsdk |
-| `fingerprint.py` | ACRCloud audio fingerprinting |
-| `audio_capture.py` | WASAPI loopback capture + audio change detection |
-| `game_detector.py` | Detects known game processes via psutil |
-| `api_client.py` | Posts to the active API profile endpoint |
-| `config.py` | INI config read/write with multi-profile API support |
-| `ui/tray.py` | System tray icon (pystray) — swaps icon when fingerprinting |
-| `ui/window.py` | Main tkinter window |
-| `ui/settings_window.py` | Tabbed settings dialog |
-| `ui/notifications.py` | Windows toast notifications (win11toast) |
+| `app/main.py` | Entry point — wires tracker, tray, window together |
+| `app/tracker.py` | Background detection loop |
+| `app/smtc.py` | Windows Media Session (SMTC) detection via winsdk |
+| `app/fingerprint.py` | ACRCloud audio fingerprinting |
+| `app/audio_capture.py` | WASAPI loopback capture + audio change detection |
+| `app/game_detector.py` | Detects known game processes via psutil |
+| `app/api_client.py` | Posts to the active API profile endpoint |
+| `app/config.py` | INI config read/write with multi-profile API support |
+| `app/ui/tray.py` | System tray icon (pystray) — swaps icon when fingerprinting |
+| `app/ui/window.py` | Main tkinter window |
+| `app/ui/settings_window.py` | Tabbed settings dialog |
+| `app/ui/notifications.py` | Windows toast notifications (win11toast) |
 
 ### Detection flow
 
@@ -141,15 +142,17 @@ See [docs/playnite-plugin.md](docs/playnite-plugin.md) for build, install, and a
 
 ## Tools / utilities
 
-`smtc_debug.py` — dumps all SMTC sessions and their metadata. Useful for diagnosing detection issues:
+`app/smtc_debug.py` — dumps all SMTC sessions and their metadata. Useful for diagnosing detection issues:
 
 ```
+cd app
 poetry run python smtc_debug.py
 ```
 
 ## Development
 
 ```
+cd app
 poetry install
 poetry run pytest          # run tests
 poetry run ruff check .    # lint
