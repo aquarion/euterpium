@@ -1,0 +1,8 @@
+framework:
+  - sast_python
+  - github_actions
+quiet: true
+skip-check:
+  # workflow_dispatch inputs in deploy-create-release-tag.yml and release.yml
+  # are intentional — they accept a version bump type / version string.
+  - CKV_GHA_7

@@ -28,6 +28,14 @@ repos:
 
   - repo: local
     hooks:
+      - id: checkov
+        name: checkov security scan
+        language: python
+        entry: checkov
+        args: [--config-file, .checkov.yaml, --directory, .]
+        pass_filenames: false
+        additional_dependencies: ["checkov==3.2.517"]
+
       - id: dotnet-format
         name: dotnet format
         entry: dotnet format playnite-plugin/EuterpiumExporter.csproj --verify-no-changes
