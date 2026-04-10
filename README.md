@@ -2,10 +2,12 @@
 
 A Windows background app that detects currently playing music and posts now-playing data to a custom API. Named for Euterpe, the Greek muse of music.
 
+It's loosely tied to [Stream Delta](https://github.com/aquarion/stream-delta), my Stream Management & overlay application.
+
 ## What it does
 
 - Detects music from any app registered with Windows Media Session (SMTC): Spotify, Apple Music, browsers, Windows Media Player, etc.
-- Detects game audio via WASAPI loopback + ACRCloud fingerprinting — useful for games like Final Fantasy XIV whose OSTs are on streaming platforms but don't register with SMTC.
+- Detects game audio via WASAPI loopback + [ACRCloud](https://www.acrcloud.com/) fingerprinting — useful for games like Final Fantasy XIV whose OSTs are on streaming platforms but don't register with SMTC.
 - Posts now-playing data to a configurable API endpoint.
 - Lives in the system tray with a settings UI.
 
@@ -17,7 +19,7 @@ A Windows background app that detects currently playing music and posts now-play
 
 ## Setup
 
-```
+```bash
 cd app
 poetry install
 poetry run python main.py
@@ -68,6 +70,7 @@ Python's default `ProactorEventLoop` (IOCP) conflicts with WinRT async callbacks
 ### Apple Music quirks
 
 Apple Music for Windows has two SMTC quirks handled in `smtc.py`:
+
 - Reports playback status as `PAUSED` even when actively playing — treated as playing if track metadata is present.
 - Packs `"Artist — Album"` into the artist field and leaves `album_title` empty — split on the em dash.
 
@@ -140,18 +143,9 @@ Euterpium includes a Playnite generic plugin that automatically tells Euterpium 
 
 See [docs/playnite-plugin.md](docs/playnite-plugin.md) for build, install, and auto-update instructions.
 
-## Tools / utilities
-
-`app/smtc_debug.py` — dumps all SMTC sessions and their metadata. Useful for diagnosing detection issues:
-
-```
-cd app
-poetry run python smtc_debug.py
-```
-
 ## Development
 
-```
+```bash
 cd app
 poetry install
 poetry run pytest          # run tests
