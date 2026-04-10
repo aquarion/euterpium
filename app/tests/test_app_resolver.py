@@ -82,7 +82,7 @@ def test_resolve_from_aumid_uses_direct_lookup(monkeypatch):
         (),
         {"find_app_by_id": staticmethod(lambda app_id: ("Spotify", "spotify_id"))},
     )()
-    monkeypatch.setattr(app_resolver, "windowsapps", fake_windowsapps)
+    monkeypatch.setattr(app_resolver, "windowsapps", fake_windowsapps, raising=False)
 
     result = app_resolver._resolve_app_name_from_aumid("SpotifyAB.SpotifyMusic_xxx!Spotify")
     assert result == "Spotify"
@@ -102,7 +102,7 @@ def test_resolve_from_aumid_falls_back_to_exact_match(monkeypatch):
             ),
         },
     )()
-    monkeypatch.setattr(app_resolver, "windowsapps", fake_windowsapps)
+    monkeypatch.setattr(app_resolver, "windowsapps", fake_windowsapps, raising=False)
 
     result = app_resolver._resolve_app_name_from_aumid("AppleInc.AppleMusic_8wekyb3d8bbwe!App")
     assert result == "Apple Music"
@@ -122,7 +122,7 @@ def test_resolve_from_aumid_falls_back_to_partial_match(monkeypatch):
             ),
         },
     )()
-    monkeypatch.setattr(app_resolver, "windowsapps", fake_windowsapps)
+    monkeypatch.setattr(app_resolver, "windowsapps", fake_windowsapps, raising=False)
 
     # Partial match — the query id is a substring of the registered aid
     result = app_resolver._resolve_app_name_from_aumid("AppleInc.AppleMusic_8wekyb3d8bbwe")
@@ -141,7 +141,7 @@ def test_resolve_from_aumid_falls_back_to_registry_when_no_match(monkeypatch):
             "get_apps": staticmethod(lambda: {}),
         },
     )()
-    monkeypatch.setattr(app_resolver, "windowsapps", fake_windowsapps)
+    monkeypatch.setattr(app_resolver, "windowsapps", fake_windowsapps, raising=False)
     # Patch registry to return None
     monkeypatch.setattr(app_resolver, "_resolve_from_registry", lambda app_id: None)
 
@@ -162,7 +162,7 @@ def test_resolve_from_aumid_falls_back_to_registry_on_windowsapps_exception(monk
             )
         },
     )()
-    monkeypatch.setattr(app_resolver, "windowsapps", fake_windowsapps)
+    monkeypatch.setattr(app_resolver, "windowsapps", fake_windowsapps, raising=False)
     monkeypatch.setattr(app_resolver, "_resolve_from_registry", lambda app_id: "fallback")
 
     result = app_resolver._resolve_app_name_from_aumid("some.app")

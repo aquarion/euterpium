@@ -1,5 +1,6 @@
 import hashlib
 import queue
+import sys
 import time
 from pathlib import Path
 from unittest.mock import patch
@@ -8,6 +9,8 @@ import pytest
 import requests
 
 import updater
+
+windows_only = pytest.mark.skipif(sys.platform != "win32", reason="os.startfile is Windows-only")
 
 
 def test_normalize_version_accepts_tag_prefix():
@@ -556,6 +559,7 @@ def test_download_installer_raises_on_checksum_fetch_error(monkeypatch, tmp_path
 # ── launch_installer ──────────────────────────────────────────────────────────
 
 
+@windows_only
 def test_launch_installer_calls_startfile(monkeypatch, tmp_path):
     launched = []
     monkeypatch.setattr(updater.os, "startfile", lambda p: launched.append(p))
@@ -565,6 +569,7 @@ def test_launch_installer_calls_startfile(monkeypatch, tmp_path):
     assert launched == [str(fake_installer)]
 
 
+@windows_only
 def test_launch_installer_raises_on_error(monkeypatch, tmp_path):
     def raise_exc(p):
         raise OSError("cannot launch")
