@@ -8,6 +8,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 import config
+import startup
 
 logger = logging.getLogger(__name__)
 
@@ -146,23 +147,53 @@ class SettingsWindow:
         nb = ttk.Notebook(win)
         nb.pack(fill="both", expand=True, padx=12, pady=12)
 
+        general_tab = ttk.Frame(nb, padding=16)
         creds_tab = ttk.Frame(nb, padding=16)
         audio_tab = ttk.Frame(nb, padding=16)
         media_tab = ttk.Frame(nb, padding=16)
         games_tab = ttk.Frame(nb, padding=16)
         server_tab = ttk.Frame(nb, padding=16)
 
+        nb.add(general_tab, text="General")
         nb.add(creds_tab, text="Credentials")
         nb.add(audio_tab, text="Audio")
         nb.add(media_tab, text="Media")
         nb.add(games_tab, text="Games")
         nb.add(server_tab, text="Server")
 
+        self._build_general(general_tab)
         self._build_credentials(creds_tab)
         self._build_audio(audio_tab)
         self._build_media(media_tab)
         self._build_games(games_tab)
         self._build_server(server_tab)
+
+    # ── General tab ───────────────────────────────────────────────────────────
+
+    def _build_general(self, parent):
+        self._launch_on_startup = tk.BooleanVar(value=startup.is_enabled())
+
+        if sys.platform == "win32":
+            tk.Checkbutton(
+                parent,
+                text="Launch on startup",
+                variable=self._launch_on_startup,
+                bg=BG_CARD,
+                fg=TEXT,
+                selectcolor=BG_INPUT,
+                activebackground=BG_CARD,
+                activeforeground=TEXT,
+                font=("Segoe UI", 10),
+                relief="flat",
+                bd=0,
+                cursor="hand2",
+            ).pack(anchor="w", pady=(4, 2))
+
+            _styled_label(
+                parent,
+                "Start Euterpium automatically when you log in to Windows.",
+                dim=True,
+            ).pack(anchor="w", padx=(24, 0))
 
     # ── Credentials tab ───────────────────────────────────────────────────────
 
@@ -643,6 +674,21 @@ class SettingsWindow:
                 "Save failed",
                 f"Could not write to:\n{config.config_path()}\n\n"
                 "Check that the file is not read-only and that you have write permission to the folder.",
+                parent=self._win,
+            )
+            return
+
+        if self._launch_on_startup.get():
+            startup_ok = startup.enable()
+        else:
+            startup_ok = startup.disable()
+
+        if not startup_ok:
+            messagebox.showerror(
+                "Startup setting failed",
+                "The configuration was saved, but the Launch on startup setting could not be changed.\n\n"
+                "This can happen if Windows prevents registry changes or you do not have permission "
+                "to modify startup settings.",
                 parent=self._win,
             )
             return
