@@ -10,4 +10,5 @@ jobs:
     uses: istic/shared-workflows/.github/workflows/python-tests.yml@main
     with:
       python_version: "3.12"
+      working_directory: app
     secrets: inherit # pragma: allowlist secret

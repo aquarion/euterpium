@@ -46,8 +46,8 @@ jobs:
       - name: Cache Poetry dependencies
         uses: actions/cache@v5
         with:
-          path: .venv
-          key: venv-windows-${{ hashFiles('poetry.lock') }}
+          path: app/.venv
+          key: venv-windows-${{ hashFiles('app/poetry.lock') }}
           restore-keys: |
             venv-windows-
 
@@ -56,6 +56,7 @@ jobs:
         run: echo "$env:USERPROFILE\.local\bin" >> $env:GITHUB_PATH
 
       - name: Install dependencies
+        working-directory: app
         run: poetry install --with dev
 
       - name: Set release version from tag
@@ -64,14 +65,15 @@ jobs:
         run: |
           $tag = "${{ github.ref_name }}"
           $version = $tag.TrimStart('v')
-          $content = Get-Content version.py -Raw
+          $content = Get-Content app\version.py -Raw
           $content = $content -replace '__version__ = ".*"', "__version__ = `"$version`""
-          Set-Content version.py $content
+          Set-Content app\version.py $content
           echo "APP_VERSION=$version" >> $env:GITHUB_ENV
           echo "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
 
       - name: Test after version replacement
         if: github.event_name == 'push'
+        working-directory: app
         run: poetry run pytest --tb=short -q
         shell: pwsh
 
@@ -86,14 +88,15 @@ jobs:
           if (-not ($version -match '^\d+\.\d+\.\d+$')) {
             throw "Invalid deploy_version '$tag'. Expected semantic version like v1.2.3 or 1.2.3"
           }
-          $content = Get-Content version.py -Raw
+          $content = Get-Content app\version.py -Raw
           $content = $content -replace '__version__ = ".*"', "__version__ = `"$version`""
-          Set-Content version.py $content
+          Set-Content app\version.py $content
           echo "APP_VERSION=$version" >> $env:GITHUB_ENV
           echo "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
 
       - name: Test after version replacement
         if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
+        working-directory: app
         run: poetry run pytest --tb=short -q
         shell: pwsh
 
@@ -111,6 +114,7 @@ jobs:
           echo "PLUGIN_ZIP=$pext" >> $env:GITHUB_ENV
 
       - name: Build with PyInstaller
+        working-directory: app
         run: poetry run pyinstaller euterpium.spec
 
       - name: Install Inno Setup (pinned)
@@ -127,15 +131,15 @@ jobs:
           if (-not $iscc) {
             throw "ISCC.exe not found in expected locations"
           }
-          & $iscc "/DAppVersion=$env:APP_VERSION" "/DReleaseTag=$env:RELEASE_TAG" euterpium.iss
+          & $iscc "/DAppVersion=$env:APP_VERSION" "/DReleaseTag=$env:RELEASE_TAG" app\euterpium.iss
 
       - name: Zip the build
         run: |
           $tag = $env:RELEASE_TAG
           $zip = "euterpium-${tag}-windows.zip"
-          $installer = "dist/installer/euterpium-${tag}-setup.exe"
+          $installer = "app/dist/installer/euterpium-${tag}-setup.exe"
           $checksum = "${installer}.sha256"
-          Compress-Archive -Path dist\euterpium\* -DestinationPath $zip
+          Compress-Archive -Path app\dist\euterpium\* -DestinationPath $zip
           $hash = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLower()
           Set-Content -Path $checksum -Value $hash -NoNewline
           echo "ZIP_NAME=$zip" >> $env:GITHUB_ENV
