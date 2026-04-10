@@ -29,6 +29,8 @@ def running_tracker():
     tracker.stop()
     if tracker._thread:
         tracker._thread.join(timeout=1.0)
+        if tracker._thread.is_alive():
+            pytest.fail("Tracker thread did not stop within timeout")
 
 
 def _wait_for_manual_fingerprint(tracker, timeout=2.0):
@@ -297,6 +299,7 @@ def test_post_now_playing_with_status_not_configured_emits_warn(
         events.append(tracker.event_queue.get())
 
     assert any(e[0] == "delivery" and "not configured" in e[1] and e[2] == "warn" for e in events)
+    mock_post.assert_not_called()
 
 
 # ── Public controls (additional) ─────────────────────────────────────────────
