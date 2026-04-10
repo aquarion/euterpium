@@ -607,7 +607,6 @@ class SettingsWindow:
             capture = float(self._capture_secs.get())
             thresh = float(self._threshold.get())
             silence = int(self._min_silence.get())
-            rest_port = int(self._rest_api_port.get())
 
             if not (0 < poll <= 60):
                 raise ValueError("Poll interval must be between 0 and 60")
@@ -615,8 +614,18 @@ class SettingsWindow:
                 raise ValueError("Capture length must be between 1 and 30")
             if not (0.0 <= thresh <= 1.0):
                 raise ValueError("Change threshold must be between 0.0 and 1.0")
-            if not (1024 <= rest_port <= 65535):
-                raise ValueError("REST API port must be between 1024 and 65535")
+
+            # Only validate the REST API port when the server is enabled; when disabled
+            # an invalid/empty port field should not block saving other settings.
+            if self._rest_api_enabled.get():
+                rest_port = int(self._rest_api_port.get())
+                if not (1024 <= rest_port <= 65535):
+                    raise ValueError("REST API port must be between 1024 and 65535")
+            else:
+                try:
+                    rest_port = int(self._rest_api_port.get())
+                except ValueError:
+                    rest_port = config.get_rest_api_port()
 
         except ValueError as e:
             messagebox.showerror("Invalid settings", str(e), parent=self._win)

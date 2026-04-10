@@ -301,7 +301,7 @@ namespace EuterpiumExporter
         /// <summary>
         /// Reads the [rest_api] port from euterpium.ini so the plugin follows
         /// the same port the app is listening on. Falls back to 43174 if the
-        /// file is absent or the key is missing/invalid.
+        /// file is absent or the port value is missing/invalid.
         /// </summary>
         private static int ReadPortFromConfig()
         {

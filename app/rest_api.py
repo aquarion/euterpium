@@ -1,6 +1,7 @@
 # rest_api.py — Local REST API server for Euterpium
 #
-# Listens on http://127.0.0.1:43174/api
+# By default, listens on http://127.0.0.1:43174/api
+# The port is configurable via [rest_api] port in euterpium.ini.
 # Swagger UI available at http://127.0.0.1:43174/api/
 
 import logging
@@ -16,7 +17,6 @@ import game_detector
 logger = logging.getLogger(__name__)
 
 HOST = "127.0.0.1"
-_DEFAULT_PORT = 43174
 
 
 def _build_now_playing_payload(tracker) -> dict | None:
