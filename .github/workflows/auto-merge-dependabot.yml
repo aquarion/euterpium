@@ -6,7 +6,7 @@ on:
 
 jobs:
   automerge:
-    if: github.actor == 'dependabot[bot]'
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
     uses: istic/shared-workflows/.github/workflows/auto-merge-dependabot.yml@main
     permissions:
       pull-requests: write
