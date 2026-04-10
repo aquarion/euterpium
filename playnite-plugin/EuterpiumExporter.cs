@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
@@ -26,9 +27,12 @@ namespace EuterpiumExporter
             "steam_", "easyanticheat", "eac_launcher", "battleye", "be_service",
         };
 
+        // Resolved once at startup from euterpium.ini so the port follows the app config.
+        private static readonly string _apiBaseUrl = BuildApiBaseUrl();
+
         private static readonly HttpClient _httpClient = new HttpClient
         {
-            BaseAddress = new Uri("http://127.0.0.1:43174"),
+            BaseAddress = new Uri(_apiBaseUrl),
             Timeout = TimeSpan.FromSeconds(2),
         };
 
@@ -38,7 +42,7 @@ namespace EuterpiumExporter
 
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
-            logger.Info("EuterpiumExporter: ready");
+            logger.Info($"EuterpiumExporter: ready — API at {_apiBaseUrl}/api/");
         }
 
         public override void OnGameStarted(OnGameStartedEventArgs args)
@@ -71,7 +75,7 @@ namespace EuterpiumExporter
                 return;
             }
 
-        // Build payload using the already-resolved pid variable; treat 0 as absent.
+            // Build payload using the already-resolved pid variable; treat 0 as absent.
             var payload = JsonConvert.SerializeObject(new
             {
                 process = exeName,
@@ -175,6 +179,65 @@ namespace EuterpiumExporter
             var lower = filename.ToLowerInvariant();
             return _nonGameExePatterns.Any(p => lower.Contains(p));
         }
+
+        private static string BuildApiBaseUrl()
+        {
+            int port = ReadPortFromConfig();
+            return $"http://127.0.0.1:{port}";
+        }
+
+        /// <summary>
+        /// Reads the [rest_api] port from euterpium.ini so the plugin follows
+        /// the same port the app is listening on. Falls back to 43174 if the
+        /// file is absent or the key is missing/invalid.
+        /// </summary>
+        private static int ReadPortFromConfig()
+        {
+            const int defaultPort = 43174;
+            try
+            {
+                var configPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "euterpium",
+                    "euterpium.ini"
+                );
+
+                if (!File.Exists(configPath))
+                    return defaultPort;
+
+                bool inSection = false;
+                foreach (var line in File.ReadLines(configPath))
+                {
+                    var trimmed = line.Trim();
+                    if (trimmed.StartsWith("["))
+                    {
+                        inSection = trimmed.Equals("[rest_api]", StringComparison.OrdinalIgnoreCase);
+                        continue;
+                    }
+                    if (!inSection)
+                        continue;
+                    if (!trimmed.StartsWith("port", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    var eqIdx = trimmed.IndexOf('=');
+                    if (eqIdx < 0)
+                        continue;
+
+                    var value = trimmed.Substring(eqIdx + 1).Trim();
+                    // Strip inline comments (; or #)
+                    var commentIdx = value.IndexOfAny(new[] { ';', '#' });
+                    if (commentIdx >= 0)
+                        value = value.Substring(0, commentIdx).Trim();
+
+                    if (int.TryParse(value, out int port) && port >= 1024 && port <= 65535)
+                        return port;
+                }
+            }
+            catch
+            {
+                // Fall through to default — log not available in static context
+            }
+            return defaultPort;
+        }
     }
 }
-

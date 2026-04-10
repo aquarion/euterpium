@@ -9,17 +9,19 @@ import threading
 from flask import Blueprint, Flask
 from flask_restx import Api, Namespace, Resource, fields
 
+import config
 import game_detector
 
 logger = logging.getLogger(__name__)
 
-PORT = 43174
 HOST = "127.0.0.1"
+_DEFAULT_PORT = 43174
 
 
 def _build_now_playing_payload(tracker) -> dict | None:
     """Build the payload dict that would be sent to the external API."""
-    last = tracker.last_track
+    with tracker._last_track_lock:
+        last = tracker.last_track
     if not last:
         return None
     payload = {k: v for k, v in last.items() if not k.startswith("_")}
@@ -122,7 +124,9 @@ def create_app(tracker) -> Flask:
     @ns_fingerprint.route("/now")
     class FingerprintNow(Resource):
         @ns_fingerprint.marshal_with(message_model, code=202)
-        @ns_fingerprint.doc(description="Execute an immediate fingerprint (like the 'Fingerprint Now' button).")
+        @ns_fingerprint.doc(
+            description="Execute an immediate fingerprint (like the 'Fingerprint Now' button)."
+        )
         def post(self):
             tracker.force_fingerprint()
             return {"message": "Fingerprint triggered"}, 202
@@ -133,7 +137,9 @@ def create_app(tracker) -> Flask:
     class GameStart(Resource):
         @ns_game.expect(game_input, validate=True)
         @ns_game.marshal_with(message_model, code=200)
-        @ns_game.doc(description="Notify Euterpium that a game has started. Begins game-audio fingerprinting.")
+        @ns_game.doc(
+            description="Notify Euterpium that a game has started. Begins game-audio fingerprinting."
+        )
         def post(self):
             data = api.payload
             game_detector.set_current_game(
@@ -157,14 +163,29 @@ def create_app(tracker) -> Flask:
     return app
 
 
-def start_server(tracker) -> threading.Thread:
-    """Start the REST API server in a background daemon thread."""
+def _run_server(app: Flask, port: int) -> None:
+    try:
+        app.run(host=HOST, port=port, debug=False, use_reloader=False)
+    except OSError as e:
+        logger.error("REST API failed to start on port %d: %s", port, e)
+
+
+def start_server(tracker) -> threading.Thread | None:
+    """Start the REST API server in a background daemon thread.
+
+    Reads enabled/port from config at call time. Returns None if disabled.
+    """
+    if not config.get_rest_api_enabled():
+        logger.info("REST API is disabled in config — not starting")
+        return None
+    port = config.get_rest_api_port()
     app = create_app(tracker)
     t = threading.Thread(
-        target=lambda: app.run(host=HOST, port=PORT, debug=False, use_reloader=False),
+        target=_run_server,
+        args=(app, port),
         daemon=True,
         name="rest-api",
     )
     t.start()
-    logger.info("REST API started on http://%s:%d/api/", HOST, PORT)
+    logger.info("REST API started on http://%s:%d/api/", HOST, port)
     return t

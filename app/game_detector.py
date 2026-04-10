@@ -21,7 +21,7 @@ _api_game_lock = threading.Lock()
 def set_current_game(process: str, name: str, pid: int | None = None) -> None:
     """Set the current game from the REST API, replacing the file-based transport."""
     global _api_current_game
-    entry: dict = {"process": process.strip().lower(), "display_name": name}
+    entry: dict = {"process": process.strip().lower(), "display_name": name.strip()}
     if pid is not None:
         entry["pid"] = pid
     with _api_game_lock:
@@ -79,16 +79,18 @@ def get_running_game() -> dict | None:
     2. Playnite event-driven file (euterpium_current_game.json) — legacy file transport.
     3. Manual [games] entries from euterpium.ini — covers games launched outside Playnite.
     """
+    global _api_current_game
     with _api_game_lock:
         api_game = _api_current_game
+        if api_game is not None:
+            pid = api_game.get("pid")
+            if pid is not None and not psutil.pid_exists(pid):
+                logger.debug("API current game has stale PID %d — clearing", pid)
+                _api_current_game = None
+                api_game = None
 
     if api_game is not None:
-        pid = api_game.get("pid")
-        if pid is not None and not psutil.pid_exists(pid):
-            logger.debug("API current game has stale PID %d — clearing", pid)
-            clear_current_game()
-        else:
-            return {"process": api_game["process"], "display_name": api_game["display_name"]}
+        return {"process": api_game["process"], "display_name": api_game["display_name"]}
 
     game = _get_playnite_current_game()
     if game:

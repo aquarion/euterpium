@@ -18,7 +18,7 @@ local REST API.
 
 ## Repo layout
 
-```
+```text
 app/                Python application source + tests
   main.py           Entry point — wires Tracker, TrayIcon, MainWindow, REST server
   tracker.py        Detection loop (background daemon thread)
@@ -41,22 +41,26 @@ euterpium.iss       Inno Setup installer script
 
 ## How to run tests and lint
 
-All commands run from `app/`:
+All commands run from `app/` via Poetry:
 
 ```bash
-cd app
-python -m pytest               # run all tests
-python -m pytest tests/test_rest_api.py -v   # single file
-python -m ruff check .         # lint (ruff, line length 100, target py310)
+unset VIRTUAL_ENV   # VS Code injects VIRTUAL_ENV pointing at a wrong interpreter;
+                    # unset it first or Poetry will use it instead of its own venv.
+poetry run pytest tests/ -q                        # run all tests
+poetry run pytest tests/test_rest_api.py -v        # single file
+poetry run ruff check .                            # lint
+poetry run ruff format .                           # auto-format
 ```
 
-Tests use `pytest` ≥ 8.0 and `pytest-mock`. `conftest.py` in `tests/` handles
-shared fixtures. There is no `pytest-mock` in `pyproject.toml` dev deps but it
-is used in several tests — if missing, install it before running.
+Tests use `pytest` ≥ 8.0 and `unittest.mock` (stdlib). There is no `pytest-mock`
+dependency; all mocking uses `unittest.mock.patch` / `MagicMock` directly.
+`conftest.py` in `tests/` handles shared fixtures.
 
-Non-Windows: `winsdk` / `win11toast` are platform-conditional deps. SMTC tests
-mock the import. Tests that exercise Windows-only code guard themselves with
-`pytest.importorskip` or `unittest.mock`.
+Non-Windows: `winsdk` / `win11toast` are platform-conditional deps. SMTC tests are
+skipped on non-Windows via `pytestmark = pytest.mark.skipif(...)`. Windows-only
+modules that need to be tested cross-platform (e.g. `startup.py`) use the lazy
+import pattern — `import winreg` inside the function body — so tests can inject a
+mock via `patch.dict(sys.modules, {"winreg": mock})`.
 
 ### Test conventions (`tests/conftest.py`)
 
@@ -170,6 +174,7 @@ break validation. The explicit lower bound `jsonschema>=4.18.0` in
 ## Release workflow
 
 `.github/workflows/release.yml`:
+
 1. Patches `version.py` `__version__` from the tag / workflow input.
 2. Runs PyInstaller (`euterpium.spec`) to produce the `dist/` bundle.
 3. Runs Inno Setup (`euterpium.iss`) to produce the installer.
@@ -184,6 +189,7 @@ break validation. The explicit lower bound `jsonschema>=4.18.0` in
 A `required=True` model field only enforces key *presence*; an empty string
 `""` or whitespace-only `"   "` satisfies it. Use `pattern=r'\S+'` (at least
 one non-whitespace character) on string fields that must be non-empty. That way:
+
 - The constraint is declared where it belongs (the schema).
 - It appears correctly in the Swagger UI.
 - The handler code stays clean.

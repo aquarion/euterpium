@@ -150,16 +150,19 @@ class SettingsWindow:
         audio_tab = ttk.Frame(nb, padding=16)
         media_tab = ttk.Frame(nb, padding=16)
         games_tab = ttk.Frame(nb, padding=16)
+        server_tab = ttk.Frame(nb, padding=16)
 
         nb.add(creds_tab, text="Credentials")
         nb.add(audio_tab, text="Audio")
         nb.add(media_tab, text="Media")
         nb.add(games_tab, text="Games")
+        nb.add(server_tab, text="Server")
 
         self._build_credentials(creds_tab)
         self._build_audio(audio_tab)
         self._build_media(media_tab)
         self._build_games(games_tab)
+        self._build_server(server_tab)
 
     # ── Credentials tab ───────────────────────────────────────────────────────
 
@@ -528,6 +531,42 @@ class SettingsWindow:
         for proc, name in games.items():
             self._games_text.insert("end", f"{proc} = {name}\n")
 
+    # ── Server tab ────────────────────────────────────────────────────────────
+
+    def _build_server(self, parent):
+        self._rest_api_enabled = tk.BooleanVar(value=config.get_rest_api_enabled())
+        self._rest_api_port = tk.StringVar(value=str(config.get_rest_api_port()))
+
+        tk.Label(
+            parent, text="REST API", bg=BG_CARD, fg=TEXT_DIM, font=("Segoe UI", 8, "bold")
+        ).pack(anchor="w", pady=(10, 6))
+
+        tk.Checkbutton(
+            parent,
+            text="Enable local REST API server",
+            variable=self._rest_api_enabled,
+            bg=BG_CARD,
+            fg=TEXT,
+            selectcolor=BG_INPUT,
+            activebackground=BG_CARD,
+            activeforeground=TEXT,
+            font=("Segoe UI", 9),
+            relief="flat",
+            bd=0,
+        ).pack(anchor="w")
+
+        _styled_label(
+            parent,
+            "Used by the Playnite plugin and other integrations. Listens on 127.0.0.1 only.",
+            dim=True,
+        ).pack(anchor="w", pady=(2, 12))
+
+        _styled_label(parent, "Port").pack(anchor="w", pady=(0, 1))
+        _styled_entry(parent, self._rest_api_port, width=8).pack(anchor="w")
+        _styled_label(parent, "Default: 43174. Changes take effect on restart.", dim=True).pack(
+            anchor="w", pady=(2, 0)
+        )
+
     # ── Save ──────────────────────────────────────────────────────────────────
 
     def _save(self):
@@ -537,6 +576,7 @@ class SettingsWindow:
             capture = float(self._capture_secs.get())
             thresh = float(self._threshold.get())
             silence = int(self._min_silence.get())
+            rest_port = int(self._rest_api_port.get())
 
             if not (0 < poll <= 60):
                 raise ValueError("Poll interval must be between 0 and 60")
@@ -544,6 +584,8 @@ class SettingsWindow:
                 raise ValueError("Capture length must be between 1 and 30")
             if not (0.0 <= thresh <= 1.0):
                 raise ValueError("Change threshold must be between 0.0 and 1.0")
+            if not (1024 <= rest_port <= 65535):
+                raise ValueError("REST API port must be between 1024 and 65535")
 
         except ValueError as e:
             messagebox.showerror("Invalid settings", str(e), parent=self._win)
@@ -589,6 +631,10 @@ class SettingsWindow:
                 },
                 "smtc": {"ignore": ", ".join(ignored)},
                 "games": games,
+                "rest_api": {
+                    "enabled": "true" if self._rest_api_enabled.get() else "false",
+                    "port": str(rest_port),
+                },
             }
         )
 

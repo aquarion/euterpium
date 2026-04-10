@@ -242,6 +242,18 @@ def get_smtc_ignored_apps() -> list[str]:
     return [s.strip().lower() for s in raw.split(",") if s.strip()]
 
 
+# ── REST API ──────────────────────────────────────────────────────────────────
+
+
+def get_rest_api_enabled() -> bool:
+    raw = _cfg().get("rest_api", "enabled", fallback="true").strip().lower()
+    return raw not in ("0", "false", "no", "off")
+
+
+def get_rest_api_port() -> int:
+    return _getint(_cfg(), "rest_api", "port", 43174)
+
+
 # ── Write helper ──────────────────────────────────────────────────────────────
 
 
