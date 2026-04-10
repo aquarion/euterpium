@@ -9,10 +9,12 @@ updates:
     directory: "/app"
     schedule:
       interval: "weekly"
+    target-branch: "dependabot-updates"
   - package-ecosystem: "nuget"
     directory: "/playnite-plugin"
     schedule:
       interval: "weekly"
+    target-branch: "dependabot-updates"
     ignore:
       # Pinned to match Playnite's bundled version — cannot upgrade independently
       - dependency-name: "Newtonsoft.Json"
@@ -20,7 +22,9 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
+    target-branch: "dependabot-updates"
   - package-ecosystem: pre-commit
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
+    target-branch: "dependabot-updates"
