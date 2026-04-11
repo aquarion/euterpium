@@ -133,11 +133,22 @@ namespace EuterpiumExporter
 
                 if (status == System.Net.HttpStatusCode.Unauthorized)
                 {
-                    OnApiFailure(
-                        $"EuterpiumExporter: API call to {path} returned 401 Unauthorized — " +
-                        "check that [rest_api] key in euterpium.ini matches between the app and plugin",
-                        "Euterpium: bearer token mismatch — open euterpium.ini and check [rest_api] key"
-                    );
+                    if (string.IsNullOrWhiteSpace(_apiKey))
+                    {
+                        OnApiFailure(
+                            $"EuterpiumExporter: API call to {path} returned 401 Unauthorized — " +
+                            "no [rest_api] key is configured in euterpium.ini or the plugin could not read it",
+                            "Euterpium: no API token configured/read — open euterpium.ini and set [rest_api] key"
+                        );
+                    }
+                    else
+                    {
+                        OnApiFailure(
+                            $"EuterpiumExporter: API call to {path} returned 401 Unauthorized — " +
+                            "check that [rest_api] key in euterpium.ini matches between the app and plugin",
+                            "Euterpium: bearer token mismatch — open euterpium.ini and check [rest_api] key"
+                        );
+                    }
                 }
                 else if ((int)status < 200 || (int)status >= 300)
                 {
