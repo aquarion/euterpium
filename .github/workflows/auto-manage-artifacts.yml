@@ -5,6 +5,10 @@ on:
     - cron: '0 1 * * *'
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   cleanup:
+    permissions:
+      actions: write
     uses: istic/shared-workflows/.github/workflows/auto-manage-artifacts.yml@main

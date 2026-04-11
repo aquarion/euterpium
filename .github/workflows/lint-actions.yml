@@ -10,6 +10,8 @@ on:
     paths:
       - ".github/workflows/**"
 
+permissions: read-all
+
 jobs:
   actionlint:
     runs-on: ubuntu-latest

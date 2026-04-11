@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
 
+permissions: read-all
+
 jobs:
   changes:
     runs-on: ubuntu-latest

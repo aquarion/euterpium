@@ -6,6 +6,7 @@ import threading
 
 import config
 import smtc
+from rest_api import start_server as start_rest_server
 from tracker import Tracker
 from ui.notifications import notify_track, notify_update_available
 from ui.tray import TrayIcon
@@ -171,6 +172,7 @@ def main():
     # Tray runs in main thread (required by pystray on Windows) — blocks here
     logger.info("Euterpium running — check your system tray")
     update_manager.check_for_updates(manual=False)
+    start_rest_server(tracker)
     tray.run()
 
 

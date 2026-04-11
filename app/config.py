@@ -242,6 +242,47 @@ def get_smtc_ignored_apps() -> list[str]:
     return [s.strip().lower() for s in raw.split(",") if s.strip()]
 
 
+# ── REST API ──────────────────────────────────────────────────────────────────
+
+
+def get_rest_api_enabled() -> bool:
+    raw = _cfg().get("rest_api", "enabled", fallback="true").strip().lower()
+    return raw not in ("0", "false", "no", "off")
+
+
+def get_rest_api_port() -> int:
+    port = _getint(_cfg(), "rest_api", "port", 43174)
+    if port < 1024 or port > 65535:
+        logger.warning("REST API port %d is out of range (1024–65535) — using default 43174", port)
+        return 43174
+    return port
+
+
+def get_rest_api_key() -> str:
+    """Return the REST API bearer token, generating and persisting one if absent.
+
+    If the config directory is unavailable, returns an ephemeral per-run key so auth
+    is always enforced. The Playnite plugin will not be able to connect in that session
+    (it also reads the key from the same config file).
+    """
+    import secrets
+
+    key = _cfg().get("rest_api", "key", fallback="").strip()
+    if key:
+        return key
+    if _CONFIG_UNAVAILABLE:
+        ephemeral = secrets.token_urlsafe(32)
+        logger.warning(
+            "Config unavailable — REST API will use an ephemeral key for this run; "
+            "Playnite plugin integration will not work until config is accessible"
+        )
+        return ephemeral
+    new_key = secrets.token_urlsafe(32)
+    save({"rest_api": {"key": new_key}})
+    logger.info("Generated REST API bearer token and saved to config")
+    return new_key
+
+
 # ── Write helper ──────────────────────────────────────────────────────────────
 
 
