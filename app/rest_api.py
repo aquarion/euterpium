@@ -223,5 +223,5 @@ def start_server(tracker) -> threading.Thread | None:
         name="rest-api",
     )
     t.start()
-    logger.info("REST API started on http://%s:%d/api/", HOST, port)
+    logger.info("REST API starting on http://%s:%d/api/", HOST, port)
     return t
