@@ -37,6 +37,12 @@ def identify_audio(wav_bytes: bytes) -> dict | None:
 
     Result dict keys:
         title, artist, album, release_date, acrid, streaming_links
+
+    ``streaming_links`` contains the raw ACRCloud ``external_metadata`` object
+    verbatim — a dict keyed by platform (e.g. ``spotify``, ``deezer``,
+    ``youtube``, ``musicbrainz``) whose values are platform-specific nested
+    dicts/lists.  The exact shape depends on what ACRCloud returns for the
+    matched track.
     """
     # Read credentials fresh each call so settings changes take effect immediately
     access_key = config.get_acrcloud_access_key()

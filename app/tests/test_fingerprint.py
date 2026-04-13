@@ -140,6 +140,20 @@ def test_identify_audio_returns_result_on_success(monkeypatch, configured_creden
 
 
 def test_identify_audio_includes_streaming_links(monkeypatch, configured_credentials):
+    external_metadata = {
+        "spotify": {
+            "track": {"id": "spotify_track_id"},
+            "artists": [{"id": "artist_id"}],
+            "album": {"id": "album_id"},
+        },
+        "deezer": {
+            "track": {"id": "deezer_track_id"},
+            "artists": [{"id": "artist_id"}],
+            "album": {"id": "album_id"},
+        },
+        "youtube": {"vid": "youtube_vid"},
+        "musicbrainz": [{"track": {"id": "mb_track_id"}}],
+    }
     response = _make_response(
         {
             "status": {"code": 0, "msg": "Success"},
@@ -151,12 +165,7 @@ def test_identify_audio_includes_streaming_links(monkeypatch, configured_credent
                         "album": {},
                         "release_date": "",
                         "acrid": "abc123",
-                        "external_metadata": {
-                            "spotify": {"track": {"id": "spotify_track_id"}, "artists": [{"id": "artist_id"}], "album": {"id": "album_id"}},
-                            "deezer": {"track": {"id": "deezer_track_id"}, "artists": [{"id": "artist_id"}], "album": {"id": "album_id"}},
-                            "youtube": {"vid": "youtube_vid"},
-                            "musicbrainz": [{"track": {"id": "mb_track_id"}}],
-                        },
+                        "external_metadata": external_metadata,
                     }
                 ]
             },
@@ -167,12 +176,7 @@ def test_identify_audio_includes_streaming_links(monkeypatch, configured_credent
     result = fingerprint.identify_audio(b"audio")
 
     assert result is not None
-    assert result["streaming_links"] == {
-        "spotify": {"track": {"id": "spotify_track_id"}, "artists": [{"id": "artist_id"}], "album": {"id": "album_id"}},
-        "deezer": {"track": {"id": "deezer_track_id"}, "artists": [{"id": "artist_id"}], "album": {"id": "album_id"}},
-        "youtube": {"vid": "youtube_vid"},
-        "musicbrainz": [{"track": {"id": "mb_track_id"}}],
-    }
+    assert result["streaming_links"] == external_metadata
 
 
 def test_identify_audio_returns_none_on_malformed_response(monkeypatch, configured_credentials):
