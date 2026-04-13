@@ -152,8 +152,10 @@ def test_identify_audio_includes_streaming_links(monkeypatch, configured_credent
                         "release_date": "",
                         "acrid": "abc123",
                         "external_metadata": {
-                            "spotify": {"track": {"id": "spotify_track_id"}},
-                            "youtube": {"track": {"id": "youtube_video_id"}},
+                            "spotify": {"track": {"id": "spotify_track_id"}, "artists": [{"id": "artist_id"}], "album": {"id": "album_id"}},
+                            "deezer": {"track": {"id": "deezer_track_id"}, "artists": [{"id": "artist_id"}], "album": {"id": "album_id"}},
+                            "youtube": {"vid": "youtube_vid"},
+                            "musicbrainz": [{"track": {"id": "mb_track_id"}}],
                         },
                     }
                 ]
@@ -166,8 +168,10 @@ def test_identify_audio_includes_streaming_links(monkeypatch, configured_credent
 
     assert result is not None
     assert result["streaming_links"] == {
-        "spotify": "spotify_track_id",
-        "youtube": "youtube_video_id",
+        "spotify": {"track": {"id": "spotify_track_id"}, "artists": [{"id": "artist_id"}], "album": {"id": "album_id"}},
+        "deezer": {"track": {"id": "deezer_track_id"}, "artists": [{"id": "artist_id"}], "album": {"id": "album_id"}},
+        "youtube": {"vid": "youtube_vid"},
+        "musicbrainz": [{"track": {"id": "mb_track_id"}}],
     }
 
 

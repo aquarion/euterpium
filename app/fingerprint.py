@@ -85,13 +85,6 @@ def identify_audio(wav_bytes: bytes) -> dict | None:
         artists = ", ".join(a["name"] for a in music.get("artists", []))
         album_info = music.get("album", {})
 
-        # Extract streaming links if available
-        streaming = {}
-        for platform, info in music.get("external_metadata", {}).items():
-            track_id = info.get("track", {}).get("id")
-            if track_id:
-                streaming[platform] = track_id
-
         return {
             "source": "acrcloud",
             "title": music.get("title", ""),
@@ -99,7 +92,7 @@ def identify_audio(wav_bytes: bytes) -> dict | None:
             "album": album_info.get("name", ""),
             "release_date": music.get("release_date", ""),
             "acrid": music.get("acrid", ""),
-            "streaming_links": streaming,
+            "streaming_links": music.get("external_metadata", {}),
         }
 
     except (KeyError, IndexError) as e:
