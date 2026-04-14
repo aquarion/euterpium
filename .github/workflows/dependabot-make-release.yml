@@ -1,0 +1,101 @@
+name: "[Dependabot] Make Release"
+
+on:
+  schedule:
+    - cron: "0 3 * * 1" # Monday 3am UTC
+  workflow_dispatch:
+    inputs:
+      merge_dependabot:
+        description: "Merge dependabot-updates into main first"
+        required: false
+        default: true
+        type: boolean
+      version_bump:
+        description: "Version bump type"
+        required: true
+        default: "patch"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions: {}
+
+jobs:
+  check-for-updates:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      has_updates: ${{ steps.check.outputs.has_updates }}
+      version_bump: ${{ steps.params.outputs.version_bump }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolve parameters
+        id: params
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "version_bump=patch" >> "$GITHUB_OUTPUT"
+          else
+            echo "version_bump=${{ inputs.version_bump }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check if dependabot-updates is ahead of main
+        id: check
+        run: |
+          git fetch origin
+          if ! git ls-remote --exit-code origin dependabot-updates > /dev/null 2>&1; then
+            echo "dependabot-updates branch does not exist, skipping release"
+            echo "has_updates=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          AHEAD=$(git rev-list --count origin/main..origin/dependabot-updates)
+          echo "dependabot-updates is $AHEAD commits ahead of main"
+          if [ "$AHEAD" -gt 0 ]; then
+            echo "has_updates=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No new commits in dependabot-updates, skipping release"
+            echo "has_updates=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  merge-dependabot:
+    needs: check-for-updates
+    if: |
+      needs.check-for-updates.outputs.has_updates == 'true' &&
+      (github.event_name == 'schedule' || inputs.merge_dependabot == true)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge dependabot-updates into main
+        run: |
+          git fetch origin dependabot-updates
+          git merge origin/dependabot-updates --no-ff -m "Merge dependabot updates"
+          git push origin main
+
+  create-release-tag:
+    needs: [check-for-updates, merge-dependabot]
+    if: |
+      !failure() && !cancelled() &&
+      (github.event_name == 'workflow_dispatch' || needs.check-for-updates.outputs.has_updates == 'true')
+    permissions:
+      contents: write
+    uses: aquarion/euterpium/.github/workflows/deploy-create-release-tag.yml@main
+    with:
+      version_bump: ${{ needs.check-for-updates.outputs.version_bump }}
