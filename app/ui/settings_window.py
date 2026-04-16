@@ -9,6 +9,7 @@ from tkinter import messagebox, ttk
 
 import config
 import startup
+from version import APP_DISPLAY_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,7 @@ class SettingsWindow:
 
     def _build(self):
         win = tk.Toplevel(self._parent)
-        win.title("Euterpium — Settings")
+        win.title(f"{APP_DISPLAY_NAME} — Settings")
         win.configure(bg=BG)
         win.resizable(True, True)
         win.minsize(460, 400)

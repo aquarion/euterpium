@@ -43,6 +43,8 @@ def _compute_display_version(version_str: str) -> str:
         return _detect_git_branch() or "dev"
 
 
+APP_DISPLAY_NAME = "Euterpium"
+
 DEV_VERSION = "0.1.0"
 # Keep this as a quoted string literal so the release workflow can replace it.
 __version__ = "0.1.0"
