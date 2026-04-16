@@ -120,6 +120,20 @@ jobs:
       - name: Install Inno Setup (pinned)
         run: choco install innosetup --version=6.7.1 --allow-downgrade --no-progress -y
 
+      - name: Generate changelog for installer
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $notes = gh api --method POST repos/aquarion/euterpium/releases/generate-notes `
+            -f tag_name=$env:RELEASE_TAG `
+            -f target_commitish=main `
+            --jq '.body'
+          New-Item -ItemType Directory -Force -Path app\dist | Out-Null
+          $changelogRtf = "$PWD\app\dist\changelog.rtf"
+          $notes | pandoc -f markdown -t rtf -o $changelogRtf
+          echo "CHANGELOG_RTF=$changelogRtf" >> $env:GITHUB_ENV
+
       - name: Build installer
         shell: pwsh
         run: |
@@ -131,7 +145,7 @@ jobs:
           if (-not $iscc) {
             throw "ISCC.exe not found in expected locations"
           }
-          & $iscc "/DAppVersion=$env:APP_VERSION" "/DReleaseTag=$env:RELEASE_TAG" app\euterpium.iss
+          & $iscc "/DAppVersion=$env:APP_VERSION" "/DReleaseTag=$env:RELEASE_TAG" "/DChangelogFile=$env:CHANGELOG_RTF" app\euterpium.iss
 
       - name: Zip the build
         run: |
