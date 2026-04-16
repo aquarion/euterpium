@@ -129,11 +129,9 @@ jobs:
             -f tag_name=$env:RELEASE_TAG `
             -f target_commitish=main `
             --jq '.body'
-          $changelogMd = "app\dist\changelog.md"
-          $changelogRtf = "app\dist\changelog.rtf"
           New-Item -ItemType Directory -Force -Path app\dist | Out-Null
-          Set-Content -Path $changelogMd -Value $notes -Encoding UTF8
-          pandoc -f markdown -t rtf -o $changelogRtf $changelogMd
+          $changelogRtf = "$PWD\app\dist\changelog.rtf"
+          $notes | pandoc -f markdown -t rtf -o $changelogRtf
           echo "CHANGELOG_RTF=$changelogRtf" >> $env:GITHUB_ENV
 
       - name: Build installer
