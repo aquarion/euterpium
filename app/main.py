@@ -159,7 +159,8 @@ def main():
 
     # Wait for window to be ready before showing it
     window._ready.wait(timeout=5)
-    window.show()
+    if not config.get_start_minimised():
+        window.show()
 
     # On first launch (or if credentials were wiped), open Settings immediately
     if not config.is_configured():

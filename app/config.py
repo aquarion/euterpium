@@ -97,6 +97,12 @@ def _getfloat(cfg: configparser.ConfigParser, section: str, key: str, fallback: 
         return fallback
 
 
+def _getbool(cfg: configparser.ConfigParser, section: str, key: str, fallback: bool) -> bool:
+    """Parse a config value as a boolean, accepting common true/false variants."""
+    raw = cfg.get(section, key, fallback="true" if fallback else "false").strip().lower()
+    return raw in ("1", "true", "yes", "on")
+
+
 # ── Logging ───────────────────────────────────────────────────────────────────
 
 
@@ -245,9 +251,12 @@ def get_smtc_ignored_apps() -> list[str]:
 # ── REST API ──────────────────────────────────────────────────────────────────
 
 
+def get_start_minimised() -> bool:
+    return _getbool(_cfg(), "general", "start_minimised", False)
+
+
 def get_rest_api_enabled() -> bool:
-    raw = _cfg().get("rest_api", "enabled", fallback="true").strip().lower()
-    return raw not in ("0", "false", "no", "off")
+    return _getbool(_cfg(), "rest_api", "enabled", True)
 
 
 def get_rest_api_port() -> int:

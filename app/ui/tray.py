@@ -144,7 +144,7 @@ class TrayIcon:
         items.extend(
             [
                 pystray.Menu.SEPARATOR,
-                pystray.MenuItem("Show window", lambda: self.on_show_window()),
+                pystray.MenuItem("Show window", lambda: self.on_show_window(), default=True),
                 pystray.MenuItem("Settings", lambda: self.on_show_settings()),
                 *update_items,
                 pystray.Menu.SEPARATOR,
