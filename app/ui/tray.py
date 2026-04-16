@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING
 
 from PIL import Image, ImageDraw
 
+from version import APP_DISPLAY_NAME
+
 if TYPE_CHECKING:
     from updater import AvailableUpdate
 
@@ -121,7 +123,9 @@ class TrayIcon:
         if self._current_version:
             items.extend(
                 [
-                    pystray.MenuItem(f"Euterpium {self._current_version}", None, enabled=False),
+                    pystray.MenuItem(
+                        f"{APP_DISPLAY_NAME} {self._current_version}", None, enabled=False
+                    ),
                 ]
             )
 
@@ -188,7 +192,7 @@ class TrayIcon:
         self._icon = pystray.Icon(
             name="euterpium",
             icon=self._icon_default,
-            title="Euterpium — Nothing playing",
+            title=f"{APP_DISPLAY_NAME} — Nothing playing",
             menu=self._build_menu(),
         )
         self._icon.run()

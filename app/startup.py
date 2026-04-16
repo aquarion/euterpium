@@ -12,10 +12,12 @@
 import logging
 import sys
 
+from version import APP_DISPLAY_NAME
+
 logger = logging.getLogger(__name__)
 
 _REG_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
-_REG_VALUE = "Euterpium"
+_REG_VALUE = APP_DISPLAY_NAME
 
 
 def _exe_path() -> str:

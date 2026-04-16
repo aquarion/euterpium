@@ -3,6 +3,8 @@
 import logging
 import os
 
+from version import APP_DISPLAY_NAME
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -49,7 +51,7 @@ def notify_track(track: dict, game: dict | None = None):
     icon = _ICON_PATH if os.path.exists(_ICON_PATH) else None
 
     try:
-        kwargs = dict(title=heading, body=body)
+        kwargs = dict(app_id=APP_DISPLAY_NAME, title=heading, body=body)
         if icon:
             kwargs["icon"] = icon
         _notify(**kwargs)
@@ -67,7 +69,8 @@ def notify_update_available(version: str):
 
     try:
         kwargs = {
-            "title": "Euterpium update available",
+            "app_id": APP_DISPLAY_NAME,
+            "title": f"{APP_DISPLAY_NAME} update available",
             "body": f"Version {version} is ready to install from GitHub Releases.",
         }
         if icon:
