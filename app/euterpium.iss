@@ -10,6 +10,9 @@
 AppId={{B2C48E1C-6E56-4FE9-B1EF-47A643FE53D4}}
 AppName={#MyAppName}
 AppVersion={#AppVersion}
+#ifdef ChangelogFile
+InfoBeforeFile={#ChangelogFile}
+#endif
 AppPublisher=aquarion
 DefaultDirName={localappdata}\Programs\Euterpium
 DefaultGroupName={#MyAppName}
