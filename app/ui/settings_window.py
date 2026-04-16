@@ -172,6 +172,7 @@ class SettingsWindow:
 
     def _build_general(self, parent):
         self._launch_on_startup = tk.BooleanVar(value=startup.is_enabled())
+        self._start_minimised = tk.BooleanVar(value=config.get_start_minimised())
 
         if sys.platform == "win32":
             tk.Checkbutton(
@@ -194,6 +195,27 @@ class SettingsWindow:
                 "Start Euterpium automatically when you log in to Windows.",
                 dim=True,
             ).pack(anchor="w", padx=(24, 0))
+
+        tk.Checkbutton(
+            parent,
+            text="Start minimised",
+            variable=self._start_minimised,
+            bg=BG_CARD,
+            fg=TEXT,
+            selectcolor=BG_INPUT,
+            activebackground=BG_CARD,
+            activeforeground=TEXT,
+            font=("Segoe UI", 10),
+            relief="flat",
+            bd=0,
+            cursor="hand2",
+        ).pack(anchor="w", pady=(10, 2))
+
+        _styled_label(
+            parent,
+            "Hide the main window on launch — access it via the system tray icon.",
+            dim=True,
+        ).pack(anchor="w", padx=(24, 0))
 
     # ── Credentials tab ───────────────────────────────────────────────────────
 
@@ -657,6 +679,9 @@ class SettingsWindow:
 
         ok = config.save(
             {
+                "general": {
+                    "start_minimised": "true" if self._start_minimised.get() else "false",
+                },
                 "acrcloud": {
                     "host": self._acr_host.get().strip(),
                     "access_key": self._acr_key.get().strip(),

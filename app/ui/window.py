@@ -77,6 +77,7 @@ class MainWindow:
 
     def run(self):
         self._root = tk.Tk()
+        self._root.withdraw()  # hidden until show() is called
         self._build_ui()
         self._settings_window = SettingsWindow(self._root, on_saved=self._on_settings_saved)
         self._root.protocol("WM_DELETE_WINDOW", self._on_close)
