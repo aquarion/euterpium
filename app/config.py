@@ -98,21 +98,13 @@ def _getfloat(cfg: configparser.ConfigParser, section: str, key: str, fallback: 
 
 
 def _getbool(cfg: configparser.ConfigParser, section: str, key: str, fallback: bool) -> bool:
-    """Parse a config value as a boolean, accepting common true/false variants."""
+    """Parse a config value as a boolean, using fallback silently when absent."""
     try:
+        return cfg.getboolean(section, key, fallback=fallback)
+    except (ValueError, configparser.Error):
         raw = cfg.get(section, key, fallback=None)
-    except configparser.Error:
-        logger.warning(f"Invalid value for [{section}] {key} — using default ({fallback})")
+        logger.warning(f"Invalid value for [{section}] {key}: {raw!r} — using default ({fallback})")
         return fallback
-    if raw is None:
-        return fallback
-    raw = raw.strip().lower()
-    if raw in ("1", "true", "yes", "on"):
-        return True
-    if raw in ("0", "false", "no", "off"):
-        return False
-    logger.warning(f"Invalid value for [{section}] {key}: {raw!r} — using default ({fallback})")
-    return fallback
 
 
 # ── Logging ───────────────────────────────────────────────────────────────────
