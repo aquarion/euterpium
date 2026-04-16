@@ -160,6 +160,46 @@ def test_migrate_skips_when_legacy_url_is_placeholder(tmp_config):
     assert config.get_api_profiles() == {}
 
 
+# ── Boolean helper ───────────────────────────────────────────────────────────
+
+
+def test_getbool_truthy_variants(tmp_config):
+    cfg = config._load()
+    for val in ("1", "true", "yes", "on", "True", "YES", "ON"):
+        config.save({"general": {"start_minimised": val}})
+        cfg = config._load()
+        assert config._getbool(cfg, "general", "start_minimised", False) is True
+
+
+def test_getbool_falsy_variants(tmp_config):
+    for val in ("0", "false", "no", "off", "False", "NO"):
+        config.save({"general": {"start_minimised": val}})
+        cfg = config._load()
+        assert config._getbool(cfg, "general", "start_minimised", True) is False
+
+
+def test_getbool_invalid_value_returns_fallback(tmp_config):
+    config.save({"general": {"start_minimised": "maybe"}})
+    cfg = config._load()
+    assert config._getbool(cfg, "general", "start_minimised", True) is True
+    assert config._getbool(cfg, "general", "start_minimised", False) is False
+
+
+def test_getbool_missing_key_returns_fallback(tmp_config):
+    cfg = config._load()
+    assert config._getbool(cfg, "general", "start_minimised", True) is True
+    assert config._getbool(cfg, "general", "start_minimised", False) is False
+
+
+def test_get_start_minimised_default_false(tmp_config):
+    assert config.get_start_minimised() is False
+
+
+def test_get_start_minimised_reads_config(tmp_config):
+    config.save({"general": {"start_minimised": "true"}})
+    assert config.get_start_minimised() is True
+
+
 # ── Numeric fallbacks ─────────────────────────────────────────────────────────
 
 

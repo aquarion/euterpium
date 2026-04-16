@@ -99,8 +99,20 @@ def _getfloat(cfg: configparser.ConfigParser, section: str, key: str, fallback: 
 
 def _getbool(cfg: configparser.ConfigParser, section: str, key: str, fallback: bool) -> bool:
     """Parse a config value as a boolean, accepting common true/false variants."""
-    raw = cfg.get(section, key, fallback="true" if fallback else "false").strip().lower()
-    return raw in ("1", "true", "yes", "on")
+    try:
+        raw = cfg.get(section, key, fallback=None)
+    except configparser.Error:
+        logger.warning(f"Invalid value for [{section}] {key} — using default ({fallback})")
+        return fallback
+    if raw is None:
+        return fallback
+    raw = raw.strip().lower()
+    if raw in ("1", "true", "yes", "on"):
+        return True
+    if raw in ("0", "false", "no", "off"):
+        return False
+    logger.warning(f"Invalid value for [{section}] {key}: {raw!r} — using default ({fallback})")
+    return fallback
 
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -248,11 +260,14 @@ def get_smtc_ignored_apps() -> list[str]:
     return [s.strip().lower() for s in raw.split(",") if s.strip()]
 
 
-# ── REST API ──────────────────────────────────────────────────────────────────
+# ── General / UI ─────────────────────────────────────────────────────────────
 
 
 def get_start_minimised() -> bool:
     return _getbool(_cfg(), "general", "start_minimised", False)
+
+
+# ── REST API ──────────────────────────────────────────────────────────────────
 
 
 def get_rest_api_enabled() -> bool:
