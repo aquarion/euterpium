@@ -103,6 +103,42 @@ AudioChangeDetector: rms=0.142 flatness=0.31 [music] no prior fingerprint → st
 
 ---
 
+## Live Metrics UI (Option 2)
+
+A thin strip added below the Now Playing card showing two live gauges, updated on every poll cycle. Only visible when a game is running (i.e. when the fingerprint detector is active).
+
+### Gauges
+
+**Flatness** — a horizontal bar, green (0.0) → red (1.0), with the threshold marked as a vertical tick. Label: `Music ◀ · · · · ▶ Noise`. Shows at a glance whether the current audio is being treated as music or SFX.
+
+**Change** — a horizontal bar showing `hamming_distance / N` (0.0 → 1.0), with the change threshold marked as a vertical tick. Spikes when a track change is detected. Fades to grey when no fingerprint has been computed yet (silent / noise).
+
+Both bars are `tk.Canvas` widgets, ~12px tall, redrawn on each metrics event.
+
+### Data flow
+
+`AudioChangeDetector.check()` return signature changes from `bool` to a named tuple (or dataclass):
+
+```python
+@dataclass
+class CheckResult:
+    changed: bool
+    rms: float
+    flatness: float | None       # None if silent
+    hamming_ratio: float | None  # None if silent or noise or no prior fingerprint
+```
+
+`Tracker._run()` forwards metrics to the UI via a new `("metrics", CheckResult)` event type. `MainWindow._handle_message` maps this to `_update_meters()`.
+
+The existing callers of `detector.check()` treat `result.changed` as the bool — no logic changes in `tracker.py` beyond unpacking the dataclass.
+
+### Testing additions
+
+- `AudioChangeDetector.check()` returns correct `rms`, `flatness`, and `hamming_ratio` values alongside the bool in each scenario
+- Metrics widget: not unit-tested (tkinter rendering); covered by manual smoke test
+
+---
+
 ## Testing
 
 New file: `tests/test_audio_capture.py`
@@ -129,6 +165,12 @@ Mock `get_loopback_device` to inject synthetic audio (consistent with existing t
 | Second musical sample, similar spectrum | Returns False |
 | Second musical sample, different spectrum | Returns True |
 
+### `CheckResult` dataclass
+
+- `changed` is True/False as before in each scenario
+- `flatness` is None for silent audio, a float otherwise
+- `hamming_ratio` is None when there is no prior fingerprint or audio is noise/silent
+
 ### Config round-trip
 - `config.get_spectral_flatness_threshold()`, `get_fingerprint_bands()`, `get_fingerprint_change_threshold()`, `get_min_rms()` return correct values from a test ini
 
@@ -138,9 +180,9 @@ Mock `get_loopback_device` to inject synthetic audio (consistent with existing t
 
 | File | Change |
 |---|---|
-| `app/audio_capture.py` | Add spectral fingerprint logic to `AudioChangeDetector`; add 4 config constants |
+| `app/audio_capture.py` | Add spectral fingerprint logic to `AudioChangeDetector`; `check()` returns `CheckResult` dataclass instead of `bool`; add 4 config constants |
 | `app/config.py` | Add 4 getters: `get_min_rms`, `get_spectral_flatness_threshold`, `get_fingerprint_bands`, `get_fingerprint_change_threshold` |
 | `app/euterpium.ini` | Add new keys to `[audio]` section with defaults and comments |
+| `app/tracker.py` | Unpack `CheckResult.changed` instead of raw bool; forward `("metrics", result)` event to UI queue |
+| `app/ui/window.py` | Add meters strip below Now Playing card; handle `("metrics", ...)` event |
 | `tests/test_audio_capture.py` | New file — unit tests as described above |
-
-No changes to `tracker.py`, `fingerprint.py`, or UI files. The `AudioChangeDetector` interface (`check()` → bool) is unchanged.
