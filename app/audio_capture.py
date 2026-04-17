@@ -109,7 +109,7 @@ def compute_spectral_fingerprint(audio: np.ndarray, n_bands: int = 32) -> np.nda
     """
     Returns an n_bands-length binary array fingerprinting the spectral shape.
     Bit i is 1 if band i's energy exceeds its neighbors (local energy peaks).
-    Uses linearly-spaced frequency bands.
+    Uses logarithmically-spaced frequency bands to match pitch perception.
     Mixes stereo to mono before computing.
     """
     if audio.ndim > 1:
@@ -117,22 +117,20 @@ def compute_spectral_fingerprint(audio: np.ndarray, n_bands: int = 32) -> np.nda
     magnitudes = np.abs(np.fft.rfft(audio))
     n_freqs = len(magnitudes)
 
-    # n_bands linearly-spaced bin edges covering the full spectrum
-    edges = np.round(np.linspace(0, n_freqs, n_bands + 1)).astype(int)
+    # n_bands+1 log-spaced bin edges covering the full spectrum
+    edges = np.round(np.logspace(0, np.log10(max(n_freqs, 2)), n_bands + 1)).astype(int)
+    edges = np.clip(edges, 0, n_freqs)
 
     band_energies = np.array(
-        [np.sum(magnitudes[edges[i] : edges[i + 1]] ** 2) for i in range(n_bands)],
+        [
+            np.sum(magnitudes[edges[i] : max(edges[i] + 1, edges[i + 1])] ** 2)
+            for i in range(n_bands)
+        ],
         dtype=float,
     )
 
-    # Smooth with neighbors to capture spectral shape over multiple bands
-    smoothed = np.convolve(
-        np.pad(band_energies, 1, mode="edge"), np.array([0.25, 0.5, 0.25]), mode="valid"
-    )
-
-    # Bit is 1 if this band is above the median (robust to silence/noise)
-    median_energy = np.median(smoothed)
-    return (smoothed > median_energy).astype(np.uint8)
+    mean_energy = np.mean(band_energies)
+    return (band_energies > mean_energy).astype(np.uint8)
 
 
 class AudioChangeDetector:
