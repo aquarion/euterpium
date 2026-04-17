@@ -283,7 +283,7 @@ def test_get_log_level_falls_back_to_info_on_invalid(tmp_config):
     assert config.get_log_level() == logging.INFO
 
 
-# ── Spectral fingerprint config ───────────────────────────────────────────────────────
+# ── Spectral fingerprint config ───────────────────────────────────────────────
 
 
 def test_get_min_rms_default(tmp_config):
