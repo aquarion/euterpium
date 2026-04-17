@@ -97,12 +97,18 @@ def test_fingerprint_volume_change_is_below_threshold():
 
 
 def test_fingerprint_different_frequency_is_above_threshold():
-    fp1 = compute_spectral_fingerprint(_sine(200))
-    fp2 = compute_spectral_fingerprint(_sine(8000))
+    # Two signals with non-overlapping spectral content should produce
+    # fingerprints that differ by more than the change threshold.
+    # Use dense harmonic clusters at opposite ends of the spectrum.
+    t = np.linspace(0, 1.0, SAMPLE_RATE, endpoint=False)
+    low_freqs = [50, 80, 120, 160, 200, 250, 300, 350, 400, 500]
+    high_freqs = [6000, 7000, 8000, 9000, 10000, 12000, 14000, 16000, 18000, 20000]
+    low = sum(0.1 * np.sin(2 * np.pi * f * t) for f in low_freqs)
+    high = sum(0.1 * np.sin(2 * np.pi * f * t) for f in high_freqs)
+    fp1 = compute_spectral_fingerprint(low.astype(np.float32))
+    fp2 = compute_spectral_fingerprint(high.astype(np.float32))
     hamming_ratio = np.sum(fp1 != fp2) / len(fp1)
-    # Log-spaced bands with mean threshold produce sparse fingerprints for pure
-    # tones; 200 Hz and 8000 Hz land in different bands so fingerprints differ.
-    assert hamming_ratio > 0
+    assert hamming_ratio > 0.35
 
 
 def test_fingerprint_length_matches_n_bands():
