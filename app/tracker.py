@@ -274,6 +274,7 @@ class Tracker:
                         continue
 
                     result = detector.check()
+                    self._emit("metrics", result)
                     if result.changed:
                         self._emit(
                             "status", f"Audio change in {game['display_name']} — fingerprinting…"
