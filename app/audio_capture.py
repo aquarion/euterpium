@@ -3,6 +3,7 @@
 import io
 import logging
 import wave
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -14,6 +15,16 @@ from config import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class CheckResult:
+    """Return value of AudioChangeDetector.check()."""
+
+    changed: bool
+    rms: float
+    flatness: float | None = None  # None if silent
+    hamming_ratio: float | None = None  # None if silent, noisy, or no prior fingerprint
 
 
 def get_loopback_device():
@@ -74,6 +85,54 @@ def compute_rms(audio: np.ndarray) -> float:
     if audio.ndim > 1:
         audio = audio.mean(axis=1)
     return float(np.sqrt(np.mean(audio**2)))
+
+
+def compute_spectral_flatness(audio: np.ndarray) -> float:
+    """
+    Returns spectral flatness of audio (0 = pure tone, 1 = white noise).
+    Mixes stereo to mono before computing.
+    """
+    if audio.ndim > 1:
+        audio = audio.mean(axis=1)
+    magnitudes = np.abs(np.fft.rfft(audio))
+    magnitudes = magnitudes[magnitudes > 1e-10]
+    if len(magnitudes) == 0:
+        return 1.0
+    geometric_mean = np.exp(np.mean(np.log(magnitudes)))
+    arithmetic_mean = np.mean(magnitudes)
+    if arithmetic_mean < 1e-10:
+        return 1.0
+    return float(np.clip(geometric_mean / arithmetic_mean, 0.0, 1.0))
+
+
+def compute_spectral_fingerprint(audio: np.ndarray, n_bands: int = 32) -> np.ndarray:
+    """
+    Returns an n_bands-length binary array fingerprinting the spectral shape.
+    Bit i is 1 if band i's energy exceeds its neighbors (local energy peaks).
+    Uses linearly-spaced frequency bands.
+    Mixes stereo to mono before computing.
+    """
+    if audio.ndim > 1:
+        audio = audio.mean(axis=1)
+    magnitudes = np.abs(np.fft.rfft(audio))
+    n_freqs = len(magnitudes)
+
+    # n_bands linearly-spaced bin edges covering the full spectrum
+    edges = np.round(np.linspace(0, n_freqs, n_bands + 1)).astype(int)
+
+    band_energies = np.array(
+        [np.sum(magnitudes[edges[i] : edges[i + 1]] ** 2) for i in range(n_bands)],
+        dtype=float,
+    )
+
+    # Smooth with neighbors to capture spectral shape over multiple bands
+    smoothed = np.convolve(
+        np.pad(band_energies, 1, mode="edge"), np.array([0.25, 0.5, 0.25]), mode="valid"
+    )
+
+    # Bit is 1 if this band is above the median (robust to silence/noise)
+    median_energy = np.median(smoothed)
+    return (smoothed > median_energy).astype(np.uint8)
 
 
 class AudioChangeDetector:

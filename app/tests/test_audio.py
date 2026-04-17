@@ -7,7 +7,39 @@ import wave
 import numpy as np
 import pytest
 
-from audio_capture import AudioChangeDetector, audio_to_wav_bytes, compute_rms
+from audio_capture import (
+    AudioChangeDetector,
+    CheckResult,
+    audio_to_wav_bytes,
+    compute_rms,
+    compute_spectral_fingerprint,
+    compute_spectral_flatness,
+)
+
+SAMPLE_RATE = 44100
+
+
+def _sine(freq_hz: float, duration: float = 1.0) -> np.ndarray:
+    t = np.linspace(0, duration, int(SAMPLE_RATE * duration), endpoint=False)
+    return (0.5 * np.sin(2 * np.pi * freq_hz * t)).astype(np.float32)
+
+
+# ── CheckResult ───────────────────────────────────────────────────────────────
+
+
+def test_check_result_instantiation():
+    """Verify CheckResult dataclass can be instantiated."""
+    result = CheckResult(
+        changed=True,
+        rms=0.5,
+        flatness=0.1,
+        hamming_ratio=0.2,
+    )
+    assert result.changed is True
+    assert result.rms == 0.5
+    assert result.flatness == 0.1
+    assert result.hamming_ratio == 0.2
+
 
 # ── compute_rms ───────────────────────────────────────────────────────────────
 
@@ -33,6 +65,73 @@ def test_compute_rms_known_value():
     t = np.linspace(0, 2 * np.pi, 10000)
     audio = (0.5 * np.sin(t)).astype(np.float32)
     assert compute_rms(audio) == pytest.approx(0.5 / (2**0.5), rel=1e-3)
+
+
+# ── compute_spectral_flatness ─────────────────────────────────────────────────
+
+
+def test_spectral_flatness_pure_tone_is_low():
+    flatness = compute_spectral_flatness(_sine(440))
+    assert flatness < 0.3
+
+
+def test_spectral_flatness_white_noise_is_high():
+    rng = np.random.default_rng(42)
+    noise = rng.uniform(-1, 1, SAMPLE_RATE).astype(np.float32)
+    flatness = compute_spectral_flatness(noise)
+    assert flatness > 0.5
+
+
+def test_spectral_flatness_silence_returns_one():
+    audio = np.zeros(SAMPLE_RATE, dtype=np.float32)
+    assert compute_spectral_flatness(audio) == pytest.approx(1.0)
+
+
+def test_spectral_flatness_stereo_mixed_to_mono():
+    stereo = np.stack([_sine(440), _sine(440)], axis=1)
+    mono = _sine(440)
+    assert compute_spectral_flatness(stereo) == pytest.approx(
+        compute_spectral_flatness(mono), rel=1e-3
+    )
+
+
+# ── compute_spectral_fingerprint ─────────────────────────────────────────────
+
+
+def test_fingerprint_same_audio_is_identical():
+    audio = _sine(440)
+    assert np.array_equal(
+        compute_spectral_fingerprint(audio),
+        compute_spectral_fingerprint(audio),
+    )
+
+
+def test_fingerprint_volume_change_is_below_threshold():
+    audio = _sine(440)
+    fp1 = compute_spectral_fingerprint(audio)
+    fp2 = compute_spectral_fingerprint(audio * 0.1)
+    hamming_ratio = np.sum(fp1 != fp2) / len(fp1)
+    assert hamming_ratio < 0.35
+
+
+def test_fingerprint_different_frequency_is_above_threshold():
+    fp1 = compute_spectral_fingerprint(_sine(200))
+    fp2 = compute_spectral_fingerprint(_sine(8000))
+    hamming_ratio = np.sum(fp1 != fp2) / len(fp1)
+    assert hamming_ratio > 0.35
+
+
+def test_fingerprint_length_matches_n_bands():
+    assert len(compute_spectral_fingerprint(_sine(440), n_bands=16)) == 16
+
+
+def test_fingerprint_stereo_mixed_to_mono():
+    mono = _sine(440)
+    stereo = np.stack([mono, mono], axis=1)
+    assert np.array_equal(
+        compute_spectral_fingerprint(mono),
+        compute_spectral_fingerprint(stereo),
+    )
 
 
 # ── audio_to_wav_bytes ────────────────────────────────────────────────────────
