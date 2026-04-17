@@ -42,3 +42,10 @@ repos:
         language: system
         files: ^playnite-plugin/.*\.(cs|csproj)$
         pass_filenames: false
+
+      - id: gh-aw-stale
+        name: Check agentic workflow lock files are up to date
+        entry: bash .github/scripts/check-aw-stale.sh
+        language: system
+        files: ^\.github/workflows/.*\.md$
+        pass_filenames: true
