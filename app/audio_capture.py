@@ -108,7 +108,7 @@ def compute_spectral_flatness(audio: np.ndarray) -> float:
 def compute_spectral_fingerprint(audio: np.ndarray, n_bands: int = 32) -> np.ndarray:
     """
     Returns an n_bands-length binary array fingerprinting the spectral shape.
-    Bit i is 1 if band i's energy exceeds its neighbors (local energy peaks).
+    Bit i is 1 if band i's energy is above the mean across all bands.
     Uses logarithmically-spaced frequency bands to match pitch perception.
     Mixes stereo to mono before computing.
     """
