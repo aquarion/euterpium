@@ -134,7 +134,7 @@ jobs:
             --jq '.body'
           New-Item -ItemType Directory -Force -Path app\dist | Out-Null
           $changelogRtf = "$PWD\app\dist\changelog.rtf"
-          $notes | pandoc -f markdown -t rtf -o $changelogRtf
+          $notes | pandoc -f markdown -t rtf --standalone -o $changelogRtf
           echo "CHANGELOG_RTF=$changelogRtf" >> $env:GITHUB_ENV
 
       - name: Build installer
