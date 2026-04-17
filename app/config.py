@@ -221,6 +221,22 @@ def get_min_silence_before_change() -> int:
     return _getint(_cfg(), "audio", "min_silence_before_change", 2)
 
 
+def get_min_rms() -> float:
+    return _getfloat(_cfg(), "audio", "min_rms", 0.01)
+
+
+def get_spectral_flatness_threshold() -> float:
+    return _getfloat(_cfg(), "audio", "spectral_flatness_threshold", 0.6)
+
+
+def get_fingerprint_bands() -> int:
+    return _getint(_cfg(), "audio", "fingerprint_bands", 32)
+
+
+def get_fingerprint_change_threshold() -> float:
+    return _getfloat(_cfg(), "audio", "fingerprint_change_threshold", 0.35)
+
+
 # ── Games ─────────────────────────────────────────────────────────────────────
 
 
