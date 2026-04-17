@@ -213,10 +213,6 @@ def get_poll_interval() -> float:
     return _getfloat(_cfg(), "audio", "poll_interval", 1.0)
 
 
-def get_change_threshold() -> float:
-    return _getfloat(_cfg(), "audio", "change_threshold", 0.08)
-
-
 def get_min_silence_before_change() -> int:
     return _getint(_cfg(), "audio", "min_silence_before_change", 2)
 
@@ -396,7 +392,6 @@ ACTIVE_PROFILE = get_active_profile()
 SAMPLE_RATE = get_sample_rate()
 CAPTURE_SECONDS = get_capture_seconds()
 POLL_INTERVAL = get_poll_interval()
-CHANGE_THRESHOLD = get_change_threshold()
 MIN_SILENCE_BEFORE_CHANGE = get_min_silence_before_change()
 
 KNOWN_GAMES = get_known_games()

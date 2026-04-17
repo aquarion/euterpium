@@ -273,8 +273,8 @@ class Tracker:
                         time.sleep(POLL_INTERVAL)
                         continue
 
-                    changed = detector.check()
-                    if changed:
+                    result = detector.check()
+                    if result.changed:
                         self._emit(
                             "status", f"Audio change in {game['display_name']} — fingerprinting…"
                         )

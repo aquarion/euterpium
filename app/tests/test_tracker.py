@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
+from audio_capture import CheckResult
 from tracker import Tracker
 
 
@@ -662,7 +663,7 @@ def test_run_game_audio_change_identifies_track(
     mock_sleep,
     loop_tracker,
 ):
-    mock_detector_class.return_value.check.return_value = True
+    mock_detector_class.return_value.check.return_value = CheckResult(changed=True, rms=0.5)
 
     def identify_stop(wav):
         loop_tracker._stop_event.set()
@@ -681,7 +682,7 @@ def test_run_game_audio_change_identifies_track(
 def test_run_game_no_audio_change(mock_game, mock_detector_class, mock_sleep, loop_tracker):
     def check_stop():
         loop_tracker._stop_event.set()
-        return False
+        return CheckResult(changed=False, rms=0.0)
 
     mock_detector_class.return_value.check.side_effect = check_stop
     loop_tracker.start()
@@ -699,7 +700,7 @@ def test_run_game_no_audio_change(mock_game, mock_detector_class, mock_sleep, lo
 def test_run_game_audio_no_match_emits_fallback(
     mock_game, mock_detector_class, mock_capture, mock_wav, mock_identify, mock_sleep, loop_tracker
 ):
-    mock_detector_class.return_value.check.return_value = True
+    mock_detector_class.return_value.check.return_value = CheckResult(changed=True, rms=0.5)
 
     def identify_stop(wav):
         loop_tracker._stop_event.set()
