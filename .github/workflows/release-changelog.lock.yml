@@ -213,7 +213,7 @@ jobs:
           cat "${RUNNER_TEMP}/gh-aw/prompts/github_mcp_tools_with_safeoutputs_prompt.md"
           cat << 'GH_AW_PROMPT_12b0cbc8a00aff20_EOF'
           </system>
-          {{#runtime-import .github/agentic-workflows/release-changelog.md}}
+          {{#runtime-import .github/workflows/release-changelog.md}}
           GH_AW_PROMPT_12b0cbc8a00aff20_EOF
           } > "$GH_AW_PROMPT"
       - name: Interpolate variables and render templates
