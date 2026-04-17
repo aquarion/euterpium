@@ -2,8 +2,9 @@
 name: Release Changelog
 description: Generate structured release highlights for a published Euterpium release using merged PRs and commits since the previous release.
 on:
-  release:
-    types: [published]
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       tag:
@@ -42,7 +43,7 @@ The project uses conventional commit prefixes (`feat:`, `fix:`, `chore:`, etc.) 
 
 1. Determine the current release tag:
    - If triggered by `workflow_dispatch`, use the provided `tag` input.
-   - If triggered by the `release` event, use the tag from the triggering release.
+   - If triggered by `workflow_run`, find the most recently published (non-draft) release in this repository.
 2. Identify the previous release tag.
 3. Fetch all pull requests merged between the previous release and the current release (by merge date or commit range).
 4. Read each PR's title and body to understand what changed.
