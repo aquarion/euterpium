@@ -48,7 +48,8 @@ namespace EuterpiumExporter
 
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
-            logger.Info($"EuterpiumExporter: ready — API at {_apiBaseUrl}/api/");
+            var version = ReadPluginVersion();
+            logger.Info($"EuterpiumExporter v{version} ready — API at {_apiBaseUrl}/api/");
 
             // Remove legacy file written by the old file-based integration (pre-REST API).
             try
@@ -75,14 +76,16 @@ namespace EuterpiumExporter
             var game = args.Game;
             string exeName = null;
 
-            // Prefer the actual process name from the PID Playnite gives us
+            // Prefer the actual process name from the PID Playnite gives us.
+            // ProcessName (rather than MainModule.ModuleName) works when Playnite is
+            // 32-bit and the game is 64-bit — MainModule requires same-bitness access.
             var pid = args.StartedProcessId;
             if (pid > 0)
             {
                 try
                 {
-                    var proc = Process.GetProcessById((int)pid);
-                    exeName = proc.MainModule?.ModuleName;
+                    using var proc = Process.GetProcessById((int)pid);
+                    exeName = proc.ProcessName + ".exe";
                 }
                 catch (Exception ex)
                 {
@@ -320,6 +323,32 @@ namespace EuterpiumExporter
             if (int.TryParse(raw, out int port) && port >= 1024 && port <= 65535)
                 return port;
             return 43174;
+        }
+
+        /// <summary>
+        /// Reads the Version field from extension.yaml, which is deployed alongside the DLL.
+        /// Returns "unknown" if the file is absent or the field can't be parsed.
+        /// </summary>
+        private static string ReadPluginVersion()
+        {
+            try
+            {
+                var yamlPath = Path.Combine(
+                    Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location),
+                    "extension.yaml"
+                );
+                foreach (var line in File.ReadLines(yamlPath))
+                {
+                    var trimmed = line.Trim();
+                    if (trimmed.StartsWith("Version:", StringComparison.OrdinalIgnoreCase))
+                        return trimmed.Substring("Version:".Length).Trim();
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Warn($"EuterpiumExporter: could not read plugin version from extension.yaml: {ex.Message}");
+            }
+            return "unknown";
         }
 
         /// <summary>

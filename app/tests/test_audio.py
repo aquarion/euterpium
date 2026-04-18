@@ -7,7 +7,21 @@ import wave
 import numpy as np
 import pytest
 
-from audio_capture import AudioChangeDetector, audio_to_wav_bytes, compute_rms
+from audio_capture import (
+    AudioChangeDetector,
+    audio_to_wav_bytes,
+    compute_rms,
+    compute_spectral_fingerprint,
+    compute_spectral_flatness,
+)
+
+SAMPLE_RATE = 44100
+
+
+def _sine(freq_hz: float, duration: float = 1.0) -> np.ndarray:
+    t = np.linspace(0, duration, int(SAMPLE_RATE * duration), endpoint=False)
+    return (0.5 * np.sin(2 * np.pi * freq_hz * t)).astype(np.float32)
+
 
 # ── compute_rms ───────────────────────────────────────────────────────────────
 
@@ -33,6 +47,81 @@ def test_compute_rms_known_value():
     t = np.linspace(0, 2 * np.pi, 10000)
     audio = (0.5 * np.sin(t)).astype(np.float32)
     assert compute_rms(audio) == pytest.approx(0.5 / (2**0.5), rel=1e-3)
+
+
+# ── compute_spectral_flatness ─────────────────────────────────────────────────
+
+
+def test_spectral_flatness_pure_tone_is_low():
+    flatness = compute_spectral_flatness(_sine(440))
+    assert flatness < 0.3
+
+
+def test_spectral_flatness_white_noise_is_high():
+    rng = np.random.default_rng(42)
+    noise = rng.uniform(-1, 1, SAMPLE_RATE).astype(np.float32)
+    flatness = compute_spectral_flatness(noise)
+    assert flatness > 0.5
+
+
+def test_spectral_flatness_silence_returns_one():
+    audio = np.zeros(SAMPLE_RATE, dtype=np.float32)
+    assert compute_spectral_flatness(audio) == pytest.approx(1.0)
+
+
+def test_spectral_flatness_stereo_mixed_to_mono():
+    stereo = np.stack([_sine(440), _sine(440)], axis=1)
+    mono = _sine(440)
+    assert compute_spectral_flatness(stereo) == pytest.approx(
+        compute_spectral_flatness(mono), rel=1e-3
+    )
+
+
+# ── compute_spectral_fingerprint ─────────────────────────────────────────────
+
+
+def test_fingerprint_same_audio_is_identical():
+    audio = _sine(440)
+    assert np.array_equal(
+        compute_spectral_fingerprint(audio),
+        compute_spectral_fingerprint(audio),
+    )
+
+
+def test_fingerprint_volume_change_is_below_threshold():
+    audio = _sine(440)
+    fp1 = compute_spectral_fingerprint(audio)
+    fp2 = compute_spectral_fingerprint(audio * 0.1)
+    hamming_ratio = np.sum(fp1 != fp2) / len(fp1)
+    assert hamming_ratio < 0.35
+
+
+def test_fingerprint_different_frequency_is_above_threshold():
+    # Two signals with non-overlapping spectral content should produce
+    # fingerprints that differ by more than the change threshold.
+    # Use dense harmonic clusters at opposite ends of the spectrum.
+    t = np.linspace(0, 1.0, SAMPLE_RATE, endpoint=False)
+    low_freqs = [50, 80, 120, 160, 200, 250, 300, 350, 400, 500]
+    high_freqs = [6000, 7000, 8000, 9000, 10000, 12000, 14000, 16000, 18000, 20000]
+    low = sum(0.1 * np.sin(2 * np.pi * f * t) for f in low_freqs)
+    high = sum(0.1 * np.sin(2 * np.pi * f * t) for f in high_freqs)
+    fp1 = compute_spectral_fingerprint(low.astype(np.float32))
+    fp2 = compute_spectral_fingerprint(high.astype(np.float32))
+    hamming_ratio = np.sum(fp1 != fp2) / len(fp1)
+    assert hamming_ratio > 0.35
+
+
+def test_fingerprint_length_matches_n_bands():
+    assert len(compute_spectral_fingerprint(_sine(440), n_bands=16)) == 16
+
+
+def test_fingerprint_stereo_mixed_to_mono():
+    mono = _sine(440)
+    stereo = np.stack([mono, mono], axis=1)
+    assert np.array_equal(
+        compute_spectral_fingerprint(mono),
+        compute_spectral_fingerprint(stereo),
+    )
 
 
 # ── audio_to_wav_bytes ────────────────────────────────────────────────────────
@@ -71,10 +160,9 @@ def test_audio_to_wav_bytes_clips_at_boundaries():
 
 def _make_mock_loopback(amplitude_sequence):
     """
-    Returns a mock loopback device that yields a constant-amplitude buffer
+    Returns a mock loopback that yields a constant-amplitude DC buffer
     for each successive call to record(), cycling through amplitude_sequence.
     """
-
     call_count = [0]
 
     class MockRecorder:
@@ -98,47 +186,131 @@ def _make_mock_loopback(amplitude_sequence):
     return MockDevice()
 
 
-def test_detector_first_check_establishes_baseline(monkeypatch):
+def _make_mock_loopback_audio(audio_sequence):
+    """
+    Returns a mock loopback that yields pre-computed audio arrays
+    for each successive call to record().
+    """
+    call_count = [0]
+
+    class MockRecorder:
+        def __init__(self):
+            idx = min(call_count[0], len(audio_sequence) - 1)
+            self._audio = audio_sequence[idx]
+            call_count[0] += 1
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def record(self, numframes):
+            audio = self._audio
+            if len(audio) >= numframes:
+                return audio[:numframes]
+            return np.pad(audio, (0, numframes - len(audio)))
+
+    class MockDevice:
+        def recorder(self, samplerate):
+            return MockRecorder()
+
+    return MockDevice()
+
+
+def test_detector_first_check_stores_fingerprint(monkeypatch):
     import audio_capture
 
-    monkeypatch.setattr(audio_capture, "get_loopback_device", lambda: _make_mock_loopback([0.5]))
+    monkeypatch.setattr(
+        audio_capture, "get_loopback_device", lambda: _make_mock_loopback_audio([_sine(440)])
+    )
     detector = AudioChangeDetector()
-    assert detector.check() is False
-    assert detector._baseline_rms is not None
+    result = detector.check()
+    # First music detection triggers a fingerprint (silence→music transition)
+    assert result.changed is True
+    assert detector._last_fingerprint is not None
 
 
-def test_detector_no_change_on_stable_audio(monkeypatch):
+def test_detector_no_change_on_same_spectrum(monkeypatch):
     import audio_capture
 
-    calls = [0]
+    idx = [0]
+    audio = _sine(440)
 
     def mock_device():
-        calls[0] += 1
-        return _make_mock_loopback([0.5])
+        idx[0] += 1
+        return _make_mock_loopback_audio([audio])
 
     monkeypatch.setattr(audio_capture, "get_loopback_device", mock_device)
     detector = AudioChangeDetector()
-    detector.check()  # establish baseline at 0.5
-    result = detector.check()  # same level
-    assert result is False
+    detector.check()  # store first fingerprint
+    result = detector.check()  # same spectrum
+    assert result.changed is False
 
 
-def test_detector_signals_change_on_large_rms_jump(monkeypatch):
+def test_detector_signals_change_on_different_spectrum(monkeypatch):
     import audio_capture
 
-    amplitudes = [0.05, 0.9]  # quiet then loud — delta ~0.85, well above 0.15 threshold
+    t = np.linspace(0, 1.0, SAMPLE_RATE, endpoint=False)
+    low_freqs = [50, 80, 120, 160, 200, 250, 300, 350, 400, 500]
+    high_freqs = [6000, 7000, 8000, 9000, 10000, 12000, 14000, 16000, 18000, 20000]
+    low = sum(0.1 * np.sin(2 * np.pi * f * t) for f in low_freqs).astype(np.float32)
+    high = sum(0.1 * np.sin(2 * np.pi * f * t) for f in high_freqs).astype(np.float32)
+    audios = [low, high]
     idx = [0]
 
     def mock_device():
-        amp = amplitudes[min(idx[0], len(amplitudes) - 1)]
+        audio = audios[min(idx[0], len(audios) - 1)]
         idx[0] += 1
-        return _make_mock_loopback([amp])
+        return _make_mock_loopback_audio([audio])
 
     monkeypatch.setattr(audio_capture, "get_loopback_device", mock_device)
     detector = AudioChangeDetector()
-    detector.check()  # baseline at 0.05
-    result = detector.check()  # jumps to 0.9
-    assert result is True
+    detector.check()  # store fingerprint for low-frequency cluster
+    result = detector.check()  # high-frequency cluster — very different spectrum
+    assert result.changed is True
+
+
+def test_detector_noise_gate_blocks_acr_call(monkeypatch):
+    """White noise should be classified as non-music and return changed=False."""
+    import audio_capture
+
+    rng = np.random.default_rng(0)
+    noise = rng.uniform(-0.5, 0.5, SAMPLE_RATE).astype(np.float32)
+
+    monkeypatch.setattr(
+        audio_capture, "get_loopback_device", lambda: _make_mock_loopback_audio([noise])
+    )
+    detector = AudioChangeDetector()
+    result = detector.check()
+    assert result.changed is False
+    assert result.flatness is not None
+    assert result.flatness > 0.5
+
+
+def test_detector_result_contains_metrics(monkeypatch):
+    import audio_capture
+
+    monkeypatch.setattr(
+        audio_capture, "get_loopback_device", lambda: _make_mock_loopback_audio([_sine(440)])
+    )
+    detector = AudioChangeDetector()
+    detector.check()  # first check — stores fingerprint
+    result = detector.check()
+    assert isinstance(result.rms, float)
+    assert isinstance(result.flatness, float)
+    assert isinstance(result.hamming_ratio, float)
+
+
+def test_detector_result_silent_has_none_metrics(monkeypatch):
+    import audio_capture
+
+    monkeypatch.setattr(audio_capture, "get_loopback_device", lambda: _make_mock_loopback([0.0]))
+    detector = AudioChangeDetector()
+    result = detector.check()
+    assert result.changed is False
+    assert result.flatness is None
+    assert result.hamming_ratio is None
 
 
 def test_detector_returns_false_when_no_device(monkeypatch):
@@ -146,7 +318,8 @@ def test_detector_returns_false_when_no_device(monkeypatch):
 
     monkeypatch.setattr(audio_capture, "get_loopback_device", lambda: None)
     detector = AudioChangeDetector()
-    assert detector.check() is False
+    result = detector.check()
+    assert result.changed is False
 
 
 def test_detector_returns_false_when_record_raises(monkeypatch):
@@ -168,57 +341,46 @@ def test_detector_returns_false_when_record_raises(monkeypatch):
 
     monkeypatch.setattr(audio_capture, "get_loopback_device", lambda: FailingDevice())
     detector = AudioChangeDetector()
-    assert detector.check() is False
+    result = detector.check()
+    assert result.changed is False
 
 
 def test_detector_increments_quiet_count_on_silence(monkeypatch):
     import audio_capture
 
-    # Use a very small amplitude that is below the 0.01 quiet threshold
-    amplitudes = [0.001, 0.001, 0.001]
-    idx = [0]
-
-    def mock_device():
-        amp = amplitudes[min(idx[0], len(amplitudes) - 1)]
-        idx[0] += 1
-        return _make_mock_loopback([amp])
-
-    monkeypatch.setattr(audio_capture, "get_loopback_device", mock_device)
-    # Suppress both triggers so we can observe the count incrementing
+    monkeypatch.setattr(audio_capture, "get_loopback_device", lambda: _make_mock_loopback([0.0]))
     monkeypatch.setattr(audio_capture, "MIN_SILENCE_BEFORE_CHANGE", 999)
-    monkeypatch.setattr(audio_capture, "CHANGE_THRESHOLD", 999.0)
     detector = AudioChangeDetector()
-    detector.check()  # baseline at ~0 (quiet)
-    detector.check()  # quiet — increments count
-    assert detector._quiet_count == 1
+    detector.check()
+    detector.check()
+    assert detector._quiet_count == 2
 
 
-def test_detector_signals_change_after_sustained_silence(monkeypatch):
+def test_detector_resets_fingerprint_after_sustained_silence(monkeypatch):
+    """Sustained silence clears _last_fingerprint so new music is treated as fresh."""
     import audio_capture
 
-    # Drive quiet_count to MIN_SILENCE_BEFORE_CHANGE by returning silence repeatedly
-    silence = 0.0
-    loud = 0.5
-    amplitudes = [loud] + [silence] * 10
+    silence = np.zeros(SAMPLE_RATE, dtype=np.float32)
+    audios = [_sine(440)] + [silence] * 5
 
     idx = [0]
 
     def mock_device():
-        amp = amplitudes[min(idx[0], len(amplitudes) - 1)]
+        audio = audios[min(idx[0], len(audios) - 1)]
         idx[0] += 1
-        return _make_mock_loopback([amp])
+        return _make_mock_loopback_audio([audio])
 
     monkeypatch.setattr(audio_capture, "get_loopback_device", mock_device)
     monkeypatch.setattr(audio_capture, "MIN_SILENCE_BEFORE_CHANGE", 3)
-    # Also suppress the delta threshold so only silence triggers the change
-    monkeypatch.setattr(audio_capture, "CHANGE_THRESHOLD", 999.0)
 
     detector = AudioChangeDetector()
-    detector.check()  # baseline at loud
-    detector.check()  # quiet count 1
-    detector.check()  # quiet count 2
-    result = detector.check()  # quiet count hits 3 → change
-    assert result is True
+    detector.check()  # store fingerprint at 440 Hz
+    assert detector._last_fingerprint is not None
+
+    for _ in range(4):  # drive quiet count to >= 3
+        detector.check()
+
+    assert detector._last_fingerprint is None  # reset on sustained silence
 
 
 # ── get_loopback_device ───────────────────────────────────────────────────────

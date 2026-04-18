@@ -45,13 +45,13 @@ def _load_icon_image() -> Image.Image:
     # Fallback: generate the delta-in-circle icon programmatically
     logger.warning("icons/app_icon.png not found — using generated fallback icon")
     size = 64
-    img = Image.new("RGBA", (size, size), (0, 0, 0, 255))
+    img = Image.new("RGBA", (size, size), (255, 255, 255, 255))
     draw = ImageDraw.Draw(img)
     cx, cy, r = size // 2, size // 2, size // 2 - 2
-    draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=(0, 150, 0, 255), width=3)
+    draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=(200, 0, 0, 255), width=3)
     draw.polygon(
         [(cx, cy - r + 8), (cx - r + 8, cy + r - 8), (cx + r - 8, cy + r - 8)],
-        outline=(0, 150, 0, 255),
+        outline=(200, 0, 0, 255),
         width=3,
     )
     return img

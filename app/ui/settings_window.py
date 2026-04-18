@@ -483,29 +483,47 @@ class SettingsWindow:
     def _build_audio(self, parent):
         self._poll_interval = tk.StringVar(value=str(config.get_poll_interval()))
         self._capture_secs = tk.StringVar(value=str(config.get_capture_seconds()))
-        self._threshold = tk.StringVar(value=str(config.get_change_threshold()))
+        self._min_rms = tk.StringVar(value=str(config.get_min_rms()))
         self._min_silence = tk.StringVar(value=str(config.get_min_silence_before_change()))
+        self._flatness_threshold = tk.StringVar(value=str(config.get_spectral_flatness_threshold()))
+        self._fingerprint_bands = tk.StringVar(value=str(config.get_fingerprint_bands()))
+        self._change_threshold = tk.StringVar(value=str(config.get_fingerprint_change_threshold()))
 
         fields = [
             (
                 "Poll interval (seconds)",
                 self._poll_interval,
-                "How often to sample audio energy when a game is running",
+                "How often to sample audio when a game is running",
             ),
             (
                 "Capture length (seconds)",
                 self._capture_secs,
-                "Length of audio sent to ACRCloud for fingerprinting",
+                "Length of audio sent to ACRCloud for identification",
             ),
             (
-                "Change threshold (0.0 – 1.0)",
-                self._threshold,
-                "RMS energy delta that triggers a new recognition — raise if too sensitive",
+                "Silence floor (min RMS, 0.0 – 1.0)",
+                self._min_rms,
+                "Audio quieter than this is treated as silence",
             ),
             (
-                "Min quiet checks before change",
+                "Min quiet checks before silence reset",
                 self._min_silence,
-                "Consecutive silent samples before treating silence as a track change",
+                "Consecutive silent samples before clearing the stored fingerprint",
+            ),
+            (
+                "Noise gate (flatness threshold, 0.0 – 1.0)",
+                self._flatness_threshold,
+                "Audio above this is treated as SFX/noise and skips ACRCloud — lower = stricter",
+            ),
+            (
+                "Fingerprint bands",
+                self._fingerprint_bands,
+                "Number of frequency bands in the spectral fingerprint (default: 32)",
+            ),
+            (
+                "Track change threshold (0.0 – 1.0)",
+                self._change_threshold,
+                "Fraction of fingerprint bits that must differ to signal a track change",
             ),
         ]
 
@@ -628,15 +646,24 @@ class SettingsWindow:
             # Validate numeric fields
             poll = float(self._poll_interval.get())
             capture = float(self._capture_secs.get())
-            thresh = float(self._threshold.get())
             silence = int(self._min_silence.get())
+            min_rms = float(self._min_rms.get())
+            flatness = float(self._flatness_threshold.get())
+            fingerprint_bands = int(self._fingerprint_bands.get())
+            change_threshold = float(self._change_threshold.get())
 
             if not (0 < poll <= 60):
                 raise ValueError("Poll interval must be between 0 and 60")
             if not (1 <= capture <= 30):
                 raise ValueError("Capture length must be between 1 and 30")
-            if not (0.0 <= thresh <= 1.0):
-                raise ValueError("Change threshold must be between 0.0 and 1.0")
+            if not (0.0 <= min_rms <= 1.0):
+                raise ValueError("Minimum RMS must be between 0 and 1")
+            if not (0.0 <= flatness <= 1.0):
+                raise ValueError("Spectral flatness threshold must be between 0 and 1")
+            if fingerprint_bands < 1:
+                raise ValueError("Fingerprint bands must be 1 or greater")
+            if not (0.0 <= change_threshold <= 1.0):
+                raise ValueError("Fingerprint change threshold must be between 0 and 1")
 
             # Only validate the REST API port when the server is enabled; when disabled
             # an invalid/empty port field should not block saving other settings.
@@ -692,8 +719,11 @@ class SettingsWindow:
                 "audio": {
                     "poll_interval": str(poll),
                     "capture_seconds": str(capture),
-                    "change_threshold": str(thresh),
+                    "min_rms": str(min_rms),
                     "min_silence_before_change": str(silence),
+                    "spectral_flatness_threshold": str(flatness),
+                    "fingerprint_bands": str(fingerprint_bands),
+                    "fingerprint_change_threshold": str(change_threshold),
                 },
                 "smtc": {"ignore": ", ".join(ignored)},
                 "games": games,

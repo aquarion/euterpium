@@ -9,6 +9,8 @@ from datetime import datetime
 from tkinter import ttk
 from typing import TYPE_CHECKING
 
+import config
+from audio_capture import CheckResult
 from ui.settings_window import SettingsWindow
 
 if TYPE_CHECKING:
@@ -25,6 +27,8 @@ TEXT_DIM = "#6c7086"
 TEXT_GREEN = "#a6e3a1"
 TEXT_RED = "#f38ba8"
 TEXT_GOLD = "#f9e2af"
+
+METER_H = 10  # canvas height in pixels
 
 
 class MainWindow:
@@ -66,6 +70,12 @@ class MainWindow:
 
     def set_available_update(self, update_info: "AvailableUpdate | None"):
         self._queue.put(("update_state", update_info))
+
+    def update_metrics(self, result: "CheckResult"):
+        self._queue.put(("metrics", result))
+
+    def hide_meters(self):
+        self._queue.put(("game_stopped",))
 
     def show(self):
         self._queue.put(("show",))
@@ -109,6 +119,12 @@ class MainWindow:
         elif kind == "update_state":
             _, update_info = msg
             self._set_available_update(update_info)
+        elif kind == "metrics":
+            _, result = msg
+            self._update_meters(result)
+        elif kind == "game_stopped":
+            self._last_metrics = None
+            self._meters_frame.pack_forget()
         elif kind == "show":
             self._show()
         elif kind == "hide":
@@ -169,6 +185,8 @@ class MainWindow:
         )
         self._lbl_delivery.pack(anchor="w", pady=(4, 0))
 
+        self._build_meters()
+
         # ── Bottom rows (status + controls) ───────────────────────────────
         bottom_bar = tk.Frame(root, bg=BG_CARD)
         bottom_bar.pack(fill="x", side="bottom")
@@ -180,9 +198,10 @@ class MainWindow:
         controls_row.pack(fill="x")
 
         # ── Recent tracks ─────────────────────────────────────────────────
-        tk.Label(root, text="RECENT TRACKS", font=("Segoe UI", 8, "bold"), bg=BG, fg=TEXT_DIM).pack(
-            anchor="w", padx=16, pady=(4, 2)
+        self._recent_tracks_label = tk.Label(
+            root, text="RECENT TRACKS", font=("Segoe UI", 8, "bold"), bg=BG, fg=TEXT_DIM
         )
+        self._recent_tracks_label.pack(anchor="w", padx=16, pady=(4, 2))
 
         list_frame = tk.Frame(root, bg=BG)
         list_frame.pack(fill="both", expand=True, padx=16, pady=(0, 8))
@@ -285,9 +304,124 @@ class MainWindow:
             command=self._trigger_fingerprint,
         ).pack(side="right", padx=4)
 
+    def _build_meters(self):
+        """Build the spectral metrics strip (flatness + hamming distance gauges)."""
+        self._meters_frame = tk.Frame(self._root, bg=BG_CARD, padx=20, pady=6)
+
+        tk.Label(
+            self._meters_frame,
+            text="AUDIO ANALYSIS",
+            font=("Segoe UI", 7, "bold"),
+            bg=BG_CARD,
+            fg=TEXT_DIM,
+        ).pack(anchor="w")
+
+        flat_row = tk.Frame(self._meters_frame, bg=BG_CARD)
+        flat_row.pack(fill="x", pady=(3, 0))
+        tk.Label(
+            flat_row,
+            text="Music",
+            font=("Segoe UI", 8),
+            bg=BG_CARD,
+            fg=TEXT_DIM,
+            width=5,
+            anchor="e",
+        ).pack(side="left")
+        self._flatness_canvas = tk.Canvas(flat_row, height=METER_H, bg=BG, highlightthickness=0)
+        self._flatness_canvas.pack(side="left", fill="x", expand=True, padx=(4, 4))
+        tk.Label(
+            flat_row,
+            text="Noise",
+            font=("Segoe UI", 8),
+            bg=BG_CARD,
+            fg=TEXT_DIM,
+            width=5,
+            anchor="w",
+        ).pack(side="left")
+
+        change_row = tk.Frame(self._meters_frame, bg=BG_CARD)
+        change_row.pack(fill="x", pady=(3, 0))
+        tk.Label(
+            change_row,
+            text="Same",
+            font=("Segoe UI", 8),
+            bg=BG_CARD,
+            fg=TEXT_DIM,
+            width=5,
+            anchor="e",
+        ).pack(side="left")
+        self._hamming_canvas = tk.Canvas(change_row, height=METER_H, bg=BG, highlightthickness=0)
+        self._hamming_canvas.pack(side="left", fill="x", expand=True, padx=(4, 4))
+        tk.Label(
+            change_row,
+            text="Diff",
+            font=("Segoe UI", 8),
+            bg=BG_CARD,
+            fg=TEXT_DIM,
+            width=5,
+            anchor="w",
+        ).pack(side="left")
+
+        self._flatness_canvas.bind("<Configure>", lambda e: self._redraw_meters())
+        self._hamming_canvas.bind("<Configure>", lambda e: self._redraw_meters())
+
+        self._last_metrics: CheckResult | None = None
+        # Hidden until metrics arrive (i.e. a game is running)
+
+    def _update_meters(self, result: CheckResult):
+        self._last_metrics = result
+        if not self._meters_frame.winfo_ismapped():
+            self._meters_frame.pack(
+                fill="x", padx=16, pady=(0, 4), before=self._recent_tracks_label
+            )
+        self._redraw_meters()
+
+    def _redraw_meters(self):
+        if self._last_metrics is None:
+            return
+        result = self._last_metrics
+        flatness_threshold = config.get_spectral_flatness_threshold()
+        change_threshold = config.get_fingerprint_change_threshold()
+
+        for canvas in (self._flatness_canvas, self._hamming_canvas):
+            canvas.delete("all")
+
+        w_flat = self._flatness_canvas.winfo_width()
+        w_ham = self._hamming_canvas.winfo_width()
+        h = METER_H
+
+        if w_flat <= 1:
+            return
+
+        # ── Flatness bar ───────────────────────────────────────────────────
+        if result.flatness is None:
+            self._flatness_canvas.create_rectangle(0, 0, w_flat, h, fill=TEXT_DIM, outline="")
+        else:
+            fill_w = max(1, int(w_flat * result.flatness))
+            color = TEXT_GREEN if result.flatness <= flatness_threshold else TEXT_RED
+            self._flatness_canvas.create_rectangle(0, 0, fill_w, h, fill=color, outline="")
+            tick_x = int(w_flat * flatness_threshold)
+            self._flatness_canvas.create_line(tick_x, 0, tick_x, h, fill=TEXT_MAIN, width=1)
+
+        # ── Hamming / change bar ───────────────────────────────────────────
+        if w_ham <= 1:
+            return
+
+        if result.hamming_ratio is None:
+            self._hamming_canvas.create_rectangle(0, 0, w_ham, h, fill=TEXT_DIM, outline="")
+        else:
+            fill_w = max(1, int(w_ham * result.hamming_ratio))
+            color = TEXT_GREEN if result.hamming_ratio <= change_threshold else TEXT_RED
+            self._hamming_canvas.create_rectangle(0, 0, fill_w, h, fill=color, outline="")
+            tick_x = int(w_ham * change_threshold)
+            self._hamming_canvas.create_line(tick_x, 0, tick_x, h, fill=TEXT_MAIN, width=1)
+
     # ── Update methods (run in tkinter thread via queue) ──────────────────
 
     def _set_track(self, track: dict, game: dict | None):
+        if not game:
+            self._last_metrics = None
+            self._meters_frame.pack_forget()
         title = track.get("title", "") or "Unknown title"
         artist = track.get("artist", "") or ""
         album = track.get("album", "") or ""

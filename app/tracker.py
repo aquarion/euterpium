@@ -95,31 +95,14 @@ class Tracker:
                 return
 
             game = get_running_game()
-            if not game:
-                self._emit("status", "No game running — checking SMTC instead")
-                track = get_smtc_track_sync(ignored_apps=config.get_smtc_ignored_apps())
-                if track:
-                    if track.get("excluded"):
-                        if self._try_set_last_track(track, game=None):
-                            self._emit_excluded_smtc(track)
-                    elif self._try_set_last_track(track, game=None):
-                        self._emit("track", track, None)
-                        self._post_now_playing_with_status(track, game=None)
-                    else:
-                        self._emit("status", "Same track detected — no change")
-                        self._emit_duplicate_track_once(track, game=None)
-                else:
-                    self._emit("status", "No media playing")
-                return
+            context = f" from {game['display_name']}" if game else ""
+            self._emit("status", f"Fingerprinting audio{context}...")
 
-            # Game is running - try fingerprinting
-            self._emit("status", f"Fingerprinting audio from {game['display_name']}...")
             with self._fingerprint_lock:
                 audio = capture_audio()
                 if audio is None:
                     self._emit("error", "Failed to capture audio")
                     return
-
                 wav = audio_to_wav_bytes(audio)
                 track = identify_audio(wav)
 
@@ -134,6 +117,24 @@ class Tracker:
                 else:
                     self._emit("status", "Same track detected — no change")
                     self._emit_duplicate_track_once(track, game=game)
+                return
+
+            # Audio fingerprint found nothing — fall back to SMTC when no game is running
+            if not game:
+                self._emit("status", "No audio match — checking SMTC instead")
+                smtc_track = get_smtc_track_sync(ignored_apps=config.get_smtc_ignored_apps())
+                if smtc_track:
+                    if smtc_track.get("excluded"):
+                        if self._try_set_last_track(smtc_track, game=None):
+                            self._emit_excluded_smtc(smtc_track)
+                    elif self._try_set_last_track(smtc_track, game=None):
+                        self._emit("track", smtc_track, None)
+                        self._post_now_playing_with_status(smtc_track, game=None)
+                    else:
+                        self._emit("status", "Same track detected — no change")
+                        self._emit_duplicate_track_once(smtc_track, game=None)
+                else:
+                    self._emit("status", "No media playing")
             else:
                 self._emit("status", f"No match found in {game['display_name']}")
 
@@ -257,6 +258,7 @@ class Tracker:
 
     def _run(self):
         detector = AudioChangeDetector()
+        prev_in_game = False
 
         while not self._stop_event.is_set():
             if self._paused:
@@ -267,14 +269,20 @@ class Tracker:
                 game = get_running_game()
 
                 if game:
+                    if not prev_in_game:
+                        # Fresh game session — reset fingerprint state so the first
+                        # poll doesn't compare against a fingerprint from a previous game.
+                        detector._last_fingerprint = None
+                    prev_in_game = True
                     with self._last_track_lock:
                         manual_fingerprint_running = self._manual_fingerprint_running
                     if manual_fingerprint_running:
                         time.sleep(POLL_INTERVAL)
                         continue
 
-                    changed = detector.check()
-                    if changed:
+                    result = detector.check()
+                    self._emit("metrics", result)
+                    if result.changed:
                         self._emit(
                             "status", f"Audio change in {game['display_name']} — fingerprinting…"
                         )
@@ -314,6 +322,11 @@ class Tracker:
                         finally:
                             self._fingerprint_lock.release()
                 else:
+                    if prev_in_game:
+                        # Game just stopped — hide the meters strip.
+                        self._emit("game_stopped")
+                        detector._last_fingerprint = None
+                    prev_in_game = False
                     track = get_smtc_track_sync(ignored_apps=config.get_smtc_ignored_apps())
                     if track and track.get("excluded"):
                         if self._try_set_last_track(track, game=None):

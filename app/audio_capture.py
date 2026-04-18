@@ -3,17 +3,28 @@
 import io
 import logging
 import wave
+from dataclasses import dataclass
 
 import numpy as np
 
+import config
 from config import (
     CAPTURE_SECONDS,
-    CHANGE_THRESHOLD,
     MIN_SILENCE_BEFORE_CHANGE,
     SAMPLE_RATE,
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class CheckResult:
+    """Return value of AudioChangeDetector.check()."""
+
+    changed: bool
+    rms: float
+    flatness: float | None = None  # None if silent
+    hamming_ratio: float | None = None  # None if silent, noisy, or no prior fingerprint
 
 
 def get_loopback_device():
@@ -76,63 +87,145 @@ def compute_rms(audio: np.ndarray) -> float:
     return float(np.sqrt(np.mean(audio**2)))
 
 
+def compute_spectral_flatness(audio: np.ndarray) -> float:
+    """
+    Returns spectral flatness of audio (0 = pure tone, 1 = white noise).
+    Mixes stereo to mono before computing.
+    """
+    if audio.ndim > 1:
+        audio = audio.mean(axis=1)
+    magnitudes = np.abs(np.fft.rfft(audio))
+    magnitudes = magnitudes[magnitudes > 1e-10]
+    if len(magnitudes) == 0:
+        return 1.0
+    geometric_mean = np.exp(np.mean(np.log(magnitudes)))
+    arithmetic_mean = np.mean(magnitudes)
+    if arithmetic_mean < 1e-10:
+        return 1.0
+    return float(np.clip(geometric_mean / arithmetic_mean, 0.0, 1.0))
+
+
+def compute_spectral_fingerprint(audio: np.ndarray, n_bands: int = 32) -> np.ndarray:
+    """
+    Returns an n_bands-length binary array fingerprinting the spectral shape.
+    Bit i is 1 if band i's energy is above the mean across all bands.
+    Uses logarithmically-spaced frequency bands to match pitch perception.
+    Mixes stereo to mono before computing.
+    """
+    n_bands = max(1, n_bands)
+    if audio.ndim > 1:
+        audio = audio.mean(axis=1)
+    magnitudes = np.abs(np.fft.rfft(audio))
+    n_freqs = len(magnitudes)
+
+    # n_bands+1 log-spaced bin edges covering the full spectrum
+    edges = np.round(np.logspace(0, np.log10(max(n_freqs, 2)), n_bands + 1)).astype(int)
+    edges = np.clip(edges, 0, n_freqs)
+
+    band_energies = np.array(
+        [
+            np.sum(magnitudes[edges[i] : max(edges[i] + 1, edges[i + 1])] ** 2)
+            for i in range(n_bands)
+        ],
+        dtype=float,
+    )
+
+    mean_energy = np.mean(band_energies)
+    return (band_energies > mean_energy).astype(np.uint8)
+
+
 class AudioChangeDetector:
     """
-    Monitors system audio energy over time and signals when a meaningful
-    audio change has occurred (e.g. a new track starting).
+    Monitors system audio and signals when the music has meaningfully changed.
 
-    Logic:
-    - Polls audio RMS every POLL_INTERVAL seconds using a short sample
-    - Tracks a rolling baseline of recent energy
-    - Flags a change when RMS delta exceeds CHANGE_THRESHOLD
-    - Debounces by requiring a brief period of stability after a change
+    Two-stage check on each 1-second poll sample:
+    1. Spectral flatness gate — if audio looks like noise/SFX, skip ACRCloud.
+    2. Spectral fingerprint comparison — detect track changes even when loudness
+       is constant, by comparing the frequency-band energy profile.
+
+    Tuning constants are read from config on every call so UI changes take
+    effect immediately.
     """
 
-    SHORT_SAMPLE = 1.0  # seconds for energy polling (cheap)
+    SHORT_SAMPLE = 1.0  # seconds per poll sample
 
     def __init__(self):
-        self._baseline_rms: float | None = None
         self._quiet_count: int = 0
-        self._changed: bool = False
+        self._last_fingerprint: np.ndarray | None = None
 
-    def check(self) -> bool:
+    def check(self) -> CheckResult:
         """
-        Takes a short audio sample and returns True if a track change
-        is detected. Call this on a POLL_INTERVAL loop.
+        Takes a short audio sample and returns a CheckResult.
+        `result.changed` is True when recognition should be triggered — either
+        because the spectral fingerprint has changed significantly (track change)
+        or because music was detected for the first time / after a silence gap
+        (initial detection).  All other fields carry the metrics used to reach
+        that decision.
+        Call this on a POLL_INTERVAL loop.
         """
+        min_rms = config.get_min_rms()
+        flatness_threshold = config.get_spectral_flatness_threshold()
+        n_bands = config.get_fingerprint_bands()
+        change_threshold = config.get_fingerprint_change_threshold()
+
         device = get_loopback_device()
         if not device:
-            return False
+            return CheckResult(changed=False, rms=0.0)
 
         try:
             with device.recorder(samplerate=SAMPLE_RATE) as mic:
                 audio = mic.record(numframes=int(SAMPLE_RATE * self.SHORT_SAMPLE))
         except Exception as e:
             logger.debug(f"Short sample capture failed: {e}")
-            return False
+            return CheckResult(changed=False, rms=0.0)
 
         rms = compute_rms(audio)
 
-        # First reading — establish baseline
-        if self._baseline_rms is None:
-            self._baseline_rms = rms
-            return False
-
-        delta = abs(rms - self._baseline_rms)
-        is_quiet = rms < 0.01
-
-        if is_quiet:
+        # ── Silence check ──────────────────────────────────────────────────
+        if rms < min_rms:
             self._quiet_count += 1
-        else:
-            self._quiet_count = 0
+            if self._quiet_count >= MIN_SILENCE_BEFORE_CHANGE:
+                self._last_fingerprint = None
+                self._quiet_count = 0
+            logger.debug(f"AudioChangeDetector: rms={rms:.3f} → silent")
+            return CheckResult(changed=False, rms=rms)
 
-        # Detect a significant energy shift
-        if delta > CHANGE_THRESHOLD or self._quiet_count >= MIN_SILENCE_BEFORE_CHANGE:
-            self._baseline_rms = rms
-            self._quiet_count = 0
-            logger.debug(f"Audio change detected (RMS delta={delta:.3f}, rms={rms:.3f})")
-            return True
+        self._quiet_count = 0
 
-        # Slowly drift baseline toward current level
-        self._baseline_rms = self._baseline_rms * 0.95 + rms * 0.05
-        return False
+        # ── Flatness gate ──────────────────────────────────────────────────
+        flatness = compute_spectral_flatness(audio)
+        if flatness > flatness_threshold:
+            logger.debug(
+                f"AudioChangeDetector: rms={rms:.3f} flatness={flatness:.2f} [noise] → skip"
+            )
+            return CheckResult(changed=False, rms=rms, flatness=flatness)
+
+        # ── Fingerprint comparison ─────────────────────────────────────────
+        fingerprint = compute_spectral_fingerprint(audio, n_bands)
+
+        if self._last_fingerprint is None or len(self._last_fingerprint) != n_bands:
+            self._last_fingerprint = fingerprint
+            logger.debug(
+                f"AudioChangeDetector: rms={rms:.3f} flatness={flatness:.2f}"
+                f" [music] no prior fingerprint → storing (trigger)"
+            )
+            return CheckResult(changed=True, rms=rms, flatness=flatness)
+
+        hamming = int(np.sum(fingerprint != self._last_fingerprint))
+        hamming_ratio = hamming / n_bands
+        self._last_fingerprint = fingerprint
+
+        if hamming_ratio > change_threshold:
+            logger.debug(
+                f"AudioChangeDetector: rms={rms:.3f} flatness={flatness:.2f} [music]"
+                f" hamming={hamming}/{n_bands} ({hamming_ratio:.3f}) → CHANGE"
+            )
+            return CheckResult(
+                changed=True, rms=rms, flatness=flatness, hamming_ratio=hamming_ratio
+            )
+
+        logger.debug(
+            f"AudioChangeDetector: rms={rms:.3f} flatness={flatness:.2f} [music]"
+            f" hamming={hamming}/{n_bands} ({hamming_ratio:.3f}) → no change"
+        )
+        return CheckResult(changed=False, rms=rms, flatness=flatness, hamming_ratio=hamming_ratio)

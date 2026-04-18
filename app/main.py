@@ -2,6 +2,7 @@
 
 import logging
 import queue
+import sys
 import threading
 
 import config
@@ -14,18 +15,33 @@ from ui.window import MainWindow
 from updater import UpdateManager, cleanup_stale_update_dirs
 from version import __display_version__, __version__
 
-# Configure logging before any local imports so module-level log messages
-# (e.g. winsdk availability) are captured from the start
+# Configure logging at module level. Note: local imports above may emit log
+# messages before this runs; those use Python's last-resort stderr handler.
+# Default to DEBUG when running from source; packaged builds use config.
+_default_log_level = logging.INFO if getattr(sys, "frozen", False) else logging.DEBUG
+_log_fmt = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    level=_default_log_level,
+    format=_log_fmt,
     datefmt="%H:%M:%S",
 )
+
+# Dev runs also write to logs/euterpium.log so the file can be shared for debugging.
+if not getattr(sys, "frozen", False):
+    import os
+
+    _log_dir = os.path.join(os.path.dirname(__file__), "logs")
+    os.makedirs(_log_dir, exist_ok=True)
+    _file_handler = logging.FileHandler(os.path.join(_log_dir, "euterpium.log"), encoding="utf-8")
+    _file_handler.setFormatter(logging.Formatter(_log_fmt, datefmt="%H:%M:%S"))
+    logging.getLogger().addHandler(_file_handler)
 logger = logging.getLogger(__name__)
 
 
 def main():
-    logging.getLogger().setLevel(config.get_log_level())
+    # Packaged builds use config file for log level; dev runs default to DEBUG (set at module level).
+    if getattr(sys, "frozen", False):
+        logging.getLogger().setLevel(config.get_log_level())
     logger.info("Starting Euterpium %s", __version__)
 
     # Report winsdk status now that logging is definitely active
@@ -121,6 +137,13 @@ def main():
                 _, message = msg
                 window.log_status(message, level="error")
                 logger.error(message)
+
+            elif kind == "metrics":
+                _, result = msg
+                window.update_metrics(result)
+
+            elif kind == "game_stopped":
+                window.hide_meters()
 
             elif kind == "update_checked":
                 _, update = msg

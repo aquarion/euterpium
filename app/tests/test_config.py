@@ -2,6 +2,8 @@
 
 import logging
 
+import pytest
+
 import config
 
 # ── Configured checks ─────────────────────────────────────────────────────────
@@ -279,3 +281,39 @@ def test_get_log_level_case_insensitive(tmp_config):
 def test_get_log_level_falls_back_to_info_on_invalid(tmp_config):
     config.save({"logging": {"level": "NOTAVALIDLEVEL"}})
     assert config.get_log_level() == logging.INFO
+
+
+# ── Spectral fingerprint config ───────────────────────────────────────────────
+
+
+def test_get_min_rms_default(tmp_config):
+    assert config.get_min_rms() == pytest.approx(0.01)
+
+
+def test_get_spectral_flatness_threshold_default(tmp_config):
+    assert config.get_spectral_flatness_threshold() == pytest.approx(0.6)
+
+
+def test_get_fingerprint_bands_default(tmp_config):
+    assert config.get_fingerprint_bands() == 32
+
+
+def test_get_fingerprint_change_threshold_default(tmp_config):
+    assert config.get_fingerprint_change_threshold() == pytest.approx(0.35)
+
+
+def test_spectral_config_round_trip(tmp_config):
+    config.save(
+        {
+            "audio": {
+                "min_rms": "0.02",
+                "spectral_flatness_threshold": "0.5",
+                "fingerprint_bands": "16",
+                "fingerprint_change_threshold": "0.4",
+            }
+        }
+    )
+    assert config.get_min_rms() == pytest.approx(0.02)
+    assert config.get_spectral_flatness_threshold() == pytest.approx(0.5)
+    assert config.get_fingerprint_bands() == 16
+    assert config.get_fingerprint_change_threshold() == pytest.approx(0.4)
