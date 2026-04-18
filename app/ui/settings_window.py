@@ -656,14 +656,14 @@ class SettingsWindow:
                 raise ValueError("Poll interval must be between 0 and 60")
             if not (1 <= capture <= 30):
                 raise ValueError("Capture length must be between 1 and 30")
-            if min_rms < 0:
-                raise ValueError("Minimum RMS must be 0 or greater")
+            if not (0.0 <= min_rms <= 1.0):
+                raise ValueError("Minimum RMS must be between 0 and 1")
             if not (0.0 <= flatness <= 1.0):
                 raise ValueError("Spectral flatness threshold must be between 0 and 1")
             if fingerprint_bands < 1:
                 raise ValueError("Fingerprint bands must be 1 or greater")
-            if change_threshold < 0:
-                raise ValueError("Fingerprint change threshold must be 0 or greater")
+            if not (0.0 <= change_threshold <= 1.0):
+                raise ValueError("Fingerprint change threshold must be between 0 and 1")
 
             # Only validate the REST API port when the server is enabled; when disabled
             # an invalid/empty port field should not block saving other settings.

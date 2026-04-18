@@ -192,9 +192,10 @@ class MainWindow:
         controls_row.pack(fill="x")
 
         # ── Recent tracks ─────────────────────────────────────────────────
-        tk.Label(root, text="RECENT TRACKS", font=("Segoe UI", 8, "bold"), bg=BG, fg=TEXT_DIM).pack(
-            anchor="w", padx=16, pady=(4, 2)
+        self._recent_tracks_label = tk.Label(
+            root, text="RECENT TRACKS", font=("Segoe UI", 8, "bold"), bg=BG, fg=TEXT_DIM
         )
+        self._recent_tracks_label.pack(anchor="w", padx=16, pady=(4, 2))
 
         list_frame = tk.Frame(root, bg=BG)
         list_frame.pack(fill="both", expand=True, padx=16, pady=(0, 8))
@@ -364,7 +365,9 @@ class MainWindow:
     def _update_meters(self, result: CheckResult):
         self._last_metrics = result
         if not self._meters_frame.winfo_ismapped():
-            self._meters_frame.pack(fill="x", padx=16, pady=(0, 4))
+            self._meters_frame.pack(
+                fill="x", padx=16, pady=(0, 4), before=self._recent_tracks_label
+            )
         self._redraw_meters()
 
     def _redraw_meters(self):

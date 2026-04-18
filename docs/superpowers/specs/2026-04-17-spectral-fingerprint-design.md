@@ -65,10 +65,15 @@ capture 1s sample
   → rms < MIN_RMS? → silent → reset state, return False
   → flatness > SPECTRAL_FLATNESS_THRESHOLD? → non-music → log, return False
   → compute fingerprint
-  → no prior fingerprint? → store, return False
+  → no prior fingerprint? → store, return True (INITIAL — trigger recognition)
   → hamming > FINGERPRINT_CHANGE_THRESHOLD? → store, return True (CHANGE)
   → store, return False (no change)
 ```
+
+`changed=True` means "trigger recognition now" — this covers both a track
+change (hamming threshold exceeded) and an initial detection (silence→music
+transition). The first song in a session must be identified, not only changes
+between songs.
 
 The existing `_baseline_rms` slow-drift logic is removed. The silence floor (`is_quiet` / `_quiet_count`) is kept unchanged.
 

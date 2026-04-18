@@ -155,8 +155,11 @@ class AudioChangeDetector:
     def check(self) -> CheckResult:
         """
         Takes a short audio sample and returns a CheckResult.
-        `result.changed` is True when a track change is detected.
-        All other fields carry the metrics used to reach that decision.
+        `result.changed` is True when recognition should be triggered — either
+        because the spectral fingerprint has changed significantly (track change)
+        or because music was detected for the first time / after a silence gap
+        (initial detection).  All other fields carry the metrics used to reach
+        that decision.
         Call this on a POLL_INTERVAL loop.
         """
         min_rms = config.get_min_rms()

@@ -344,7 +344,10 @@ namespace EuterpiumExporter
                         return trimmed.Substring("Version:".Length).Trim();
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                logger.Warn($"EuterpiumExporter: could not read plugin version from extension.yaml: {ex.Message}");
+            }
             return "unknown";
         }
 
