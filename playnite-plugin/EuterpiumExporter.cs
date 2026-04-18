@@ -75,14 +75,16 @@ namespace EuterpiumExporter
             var game = args.Game;
             string exeName = null;
 
-            // Prefer the actual process name from the PID Playnite gives us
+            // Prefer the actual process name from the PID Playnite gives us.
+            // ProcessName (rather than MainModule.ModuleName) works when Playnite is
+            // 32-bit and the game is 64-bit — MainModule requires same-bitness access.
             var pid = args.StartedProcessId;
             if (pid > 0)
             {
                 try
                 {
                     var proc = Process.GetProcessById((int)pid);
-                    exeName = proc.MainModule?.ModuleName;
+                    exeName = proc.ProcessName + ".exe";
                 }
                 catch (Exception ex)
                 {
