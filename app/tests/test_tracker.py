@@ -5,6 +5,7 @@ import threading
 import time
 from unittest.mock import patch
 
+import numpy as np
 import pytest
 
 from audio_capture import CheckResult
@@ -165,8 +166,16 @@ def test_manual_fingerprint_requires_acrcloud_config(
 @patch("tracker.config.acrcloud_is_configured", return_value=True)
 @patch("tracker.get_running_game", return_value=None)
 @patch("tracker.get_smtc_track_sync", return_value=None)
+@patch("tracker.identify_audio", return_value=None)
+@patch("tracker.capture_audio", return_value=np.zeros(44100, dtype=np.float32))
 def test_manual_fingerprint_debouncing(
-    mock_smtc, mock_game, mock_is_configured, mock_host, running_tracker
+    mock_capture,
+    mock_identify,
+    mock_smtc,
+    mock_game,
+    mock_is_configured,
+    mock_host,
+    running_tracker,
 ):
     """Multiple rapid manual fingerprint calls should be debounced."""
     # flag is set synchronously in force_fingerprint, so second call sees it immediately
@@ -185,10 +194,18 @@ def test_manual_fingerprint_debouncing(
 @patch("tracker.config.acrcloud_is_configured", return_value=True)
 @patch("tracker.get_running_game")
 @patch("tracker.get_smtc_track_sync")
+@patch("tracker.identify_audio", return_value=None)
+@patch("tracker.capture_audio", return_value=np.zeros(44100, dtype=np.float32))
 def test_manual_fingerprint_smtc_fallback(
-    mock_smtc, mock_game, mock_is_configured, mock_host, running_tracker
+    mock_capture,
+    mock_identify,
+    mock_smtc,
+    mock_game,
+    mock_is_configured,
+    mock_host,
+    running_tracker,
 ):
-    """Manual fingerprint should fall back to SMTC when no game is running."""
+    """Manual fingerprint should fall back to SMTC when no game is running and audio has no match."""
     mock_game.return_value = None  # No game running
     mock_smtc.return_value = {"title": "SMTC Track", "source": "smtc"}
 
@@ -204,8 +221,16 @@ def test_manual_fingerprint_smtc_fallback(
 @patch("tracker.config.acrcloud_is_configured", return_value=True)
 @patch("tracker.get_running_game")
 @patch("tracker.get_smtc_track_sync")
+@patch("tracker.identify_audio", return_value=None)
+@patch("tracker.capture_audio", return_value=np.zeros(44100, dtype=np.float32))
 def test_manual_fingerprint_ignored_smtc_source_emits_debug_not_track(
-    mock_smtc, mock_game, mock_is_configured, mock_host, running_tracker
+    mock_capture,
+    mock_identify,
+    mock_smtc,
+    mock_game,
+    mock_is_configured,
+    mock_host,
+    running_tracker,
 ):
     mock_game.return_value = None
     mock_smtc.return_value = {
@@ -349,8 +374,16 @@ def test_force_fingerprint_when_not_running_emits_error(tracker):
 @patch("tracker.config.acrcloud_is_configured", return_value=True)
 @patch("tracker.get_running_game", return_value=None)
 @patch("tracker.get_smtc_track_sync")
+@patch("tracker.identify_audio", return_value=None)
+@patch("tracker.capture_audio", return_value=np.zeros(44100, dtype=np.float32))
 def test_manual_fingerprint_smtc_duplicate_track(
-    mock_smtc, mock_game, mock_is_configured, mock_host, running_tracker
+    mock_capture,
+    mock_identify,
+    mock_smtc,
+    mock_game,
+    mock_is_configured,
+    mock_host,
+    running_tracker,
 ):
     """When the SMTC track matches last_track, emit 'Same track detected'."""
     track = {"title": "Same Track", "source": "smtc"}
