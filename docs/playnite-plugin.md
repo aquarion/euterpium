@@ -5,17 +5,16 @@ so game audio fingerprinting works automatically without manual `[games]` config
 
 ## How it works
 
-When a game is launched via Playnite, the plugin writes:
+When a game is launched via Playnite, the plugin POSTs to Euterpium's local REST API:
 
 ```
-%APPDATA%\Playnite\euterpium_current_game.json
+POST http://localhost:43174/api/game/start
+{ "process": "game.exe", "name": "Game Name", "pid": 1234 }
 ```
 
-When the game stops, the file is deleted. Euterpium reads this file on each
-detection cycle — if it exists and the process is still alive, game mode
-(WASAPI loopback + ACRCloud fingerprinting) is active.
-
-On Playnite startup, any stale file from a previous crash is cleared.
+When the game stops, it POSTs to `/api/game/stop`. Euterpium switches to game mode
+(WASAPI loopback + ACRCloud fingerprinting) on start and returns to SMTC monitoring
+on stop.
 
 Works for all sources Playnite can launch: Steam, GOG, Epic, emulators, etc.
 Games launched *outside* Playnite are still covered by manual `[games]` entries
@@ -50,18 +49,3 @@ https://raw.githubusercontent.com/aquarion/euterpium/gh-pages/InstallerManifest.
 ```
 
 Playnite will check this manifest and prompt you when a new version is available.
-
-## Config
-
-By default Euterpium looks for the current game file at
-`%APPDATA%\Playnite\euterpium_current_game.json`. To override the path,
-add to `euterpium.ini`:
-
-```ini
-[playnite]
-current_game_file = C:\path\to\euterpium_current_game.json
-```
-
-## Future: REST API
-
-When issue [#16](https://github.com/aquarion/euterpium/issues/16) (local REST API) is implemented, the plugin will be updated to POST to `localhost:43174/api/game/start` and `/api/game/stop` instead of writing a file. The event-driven logic stays the same.
