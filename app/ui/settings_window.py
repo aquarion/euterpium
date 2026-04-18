@@ -647,11 +647,23 @@ class SettingsWindow:
             poll = float(self._poll_interval.get())
             capture = float(self._capture_secs.get())
             silence = int(self._min_silence.get())
+            min_rms = float(self._min_rms.get())
+            flatness = float(self._flatness_threshold.get())
+            fingerprint_bands = int(self._fingerprint_bands.get())
+            change_threshold = float(self._change_threshold.get())
 
             if not (0 < poll <= 60):
                 raise ValueError("Poll interval must be between 0 and 60")
             if not (1 <= capture <= 30):
                 raise ValueError("Capture length must be between 1 and 30")
+            if min_rms < 0:
+                raise ValueError("Minimum RMS must be 0 or greater")
+            if not (0.0 <= flatness <= 1.0):
+                raise ValueError("Spectral flatness threshold must be between 0 and 1")
+            if fingerprint_bands < 1:
+                raise ValueError("Fingerprint bands must be 1 or greater")
+            if change_threshold < 0:
+                raise ValueError("Fingerprint change threshold must be 0 or greater")
 
             # Only validate the REST API port when the server is enabled; when disabled
             # an invalid/empty port field should not block saving other settings.
@@ -707,11 +719,11 @@ class SettingsWindow:
                 "audio": {
                     "poll_interval": str(poll),
                     "capture_seconds": str(capture),
-                    "min_rms": self._min_rms.get().strip(),
+                    "min_rms": str(min_rms),
                     "min_silence_before_change": str(silence),
-                    "spectral_flatness_threshold": self._flatness_threshold.get().strip(),
-                    "fingerprint_bands": self._fingerprint_bands.get().strip(),
-                    "fingerprint_change_threshold": self._change_threshold.get().strip(),
+                    "spectral_flatness_threshold": str(flatness),
+                    "fingerprint_bands": str(fingerprint_bands),
+                    "fingerprint_change_threshold": str(change_threshold),
                 },
                 "smtc": {"ignore": ", ".join(ignored)},
                 "games": games,

@@ -196,6 +196,8 @@ class AudioChangeDetector:
             )
             return CheckResult(changed=False, rms=rms, flatness=flatness)
 
+        n_bands = max(1, n_bands)
+
         # ── Fingerprint comparison ─────────────────────────────────────────
         fingerprint = compute_spectral_fingerprint(audio, n_bands)
 

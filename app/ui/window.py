@@ -359,10 +359,12 @@ class MainWindow:
         self._hamming_canvas.bind("<Configure>", lambda e: self._redraw_meters())
 
         self._last_metrics: CheckResult | None = None
-        self._meters_frame.pack(fill="x", padx=16, pady=(0, 4))
+        # Hidden until metrics arrive (i.e. a game is running)
 
     def _update_meters(self, result: CheckResult):
         self._last_metrics = result
+        if not self._meters_frame.winfo_ismapped():
+            self._meters_frame.pack(fill="x", padx=16, pady=(0, 4))
         self._redraw_meters()
 
     def _redraw_meters(self):
@@ -408,6 +410,9 @@ class MainWindow:
     # ── Update methods (run in tkinter thread via queue) ──────────────────
 
     def _set_track(self, track: dict, game: dict | None):
+        if not game:
+            self._last_metrics = None
+            self._meters_frame.pack_forget()
         title = track.get("title", "") or "Unknown title"
         artist = track.get("artist", "") or ""
         album = track.get("album", "") or ""

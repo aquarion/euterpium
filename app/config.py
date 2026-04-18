@@ -226,7 +226,7 @@ def get_spectral_flatness_threshold() -> float:
 
 
 def get_fingerprint_bands() -> int:
-    return _getint(_cfg(), "audio", "fingerprint_bands", 32)
+    return max(1, _getint(_cfg(), "audio", "fingerprint_bands", 32))
 
 
 def get_fingerprint_change_threshold() -> float:
