@@ -203,9 +203,9 @@ class AudioChangeDetector:
             self._last_fingerprint = fingerprint
             logger.debug(
                 f"AudioChangeDetector: rms={rms:.3f} flatness={flatness:.2f}"
-                f" [music] no prior fingerprint → storing"
+                f" [music] no prior fingerprint → storing (trigger)"
             )
-            return CheckResult(changed=False, rms=rms, flatness=flatness)
+            return CheckResult(changed=True, rms=rms, flatness=flatness)
 
         hamming = int(np.sum(fingerprint != self._last_fingerprint))
         hamming_ratio = hamming / n_bands

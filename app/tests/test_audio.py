@@ -226,7 +226,8 @@ def test_detector_first_check_stores_fingerprint(monkeypatch):
     )
     detector = AudioChangeDetector()
     result = detector.check()
-    assert result.changed is False
+    # First music detection triggers a fingerprint (silence→music transition)
+    assert result.changed is True
     assert detector._last_fingerprint is not None
 
 
