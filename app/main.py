@@ -19,11 +19,22 @@ from version import __display_version__, __version__
 # (e.g. winsdk availability) are captured from the start.
 # Default to DEBUG when running from source; packaged builds use config.
 _default_log_level = logging.INFO if getattr(sys, "frozen", False) else logging.DEBUG
+_log_fmt = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 logging.basicConfig(
     level=_default_log_level,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    format=_log_fmt,
     datefmt="%H:%M:%S",
 )
+
+# Dev runs also write to logs/euterpium.log so the file can be shared for debugging.
+if not getattr(sys, "frozen", False):
+    import os
+
+    _log_dir = os.path.join(os.path.dirname(__file__), "logs")
+    os.makedirs(_log_dir, exist_ok=True)
+    _file_handler = logging.FileHandler(os.path.join(_log_dir, "euterpium.log"), encoding="utf-8")
+    _file_handler.setFormatter(logging.Formatter(_log_fmt, datefmt="%H:%M:%S"))
+    logging.getLogger().addHandler(_file_handler)
 logger = logging.getLogger(__name__)
 
 
