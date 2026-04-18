@@ -84,7 +84,7 @@ namespace EuterpiumExporter
             {
                 try
                 {
-                    var proc = Process.GetProcessById((int)pid);
+                    using var proc = Process.GetProcessById((int)pid);
                     exeName = proc.ProcessName + ".exe";
                 }
                 catch (Exception ex)

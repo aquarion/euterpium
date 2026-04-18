@@ -15,8 +15,8 @@ from ui.window import MainWindow
 from updater import UpdateManager, cleanup_stale_update_dirs
 from version import __display_version__, __version__
 
-# Configure logging before any local imports so module-level log messages
-# (e.g. winsdk availability) are captured from the start.
+# Configure logging at module level. Note: local imports above may emit log
+# messages before this runs; those use Python's last-resort stderr handler.
 # Default to DEBUG when running from source; packaged builds use config.
 _default_log_level = logging.INFO if getattr(sys, "frozen", False) else logging.DEBUG
 _log_fmt = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -141,6 +141,9 @@ def main():
             elif kind == "metrics":
                 _, result = msg
                 window.update_metrics(result)
+
+            elif kind == "game_stopped":
+                window.hide_meters()
 
             elif kind == "update_checked":
                 _, update = msg

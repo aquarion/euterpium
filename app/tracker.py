@@ -258,6 +258,7 @@ class Tracker:
 
     def _run(self):
         detector = AudioChangeDetector()
+        prev_in_game = False
 
         while not self._stop_event.is_set():
             if self._paused:
@@ -268,6 +269,11 @@ class Tracker:
                 game = get_running_game()
 
                 if game:
+                    if not prev_in_game:
+                        # Fresh game session — reset fingerprint state so the first
+                        # poll doesn't compare against a fingerprint from a previous game.
+                        detector._last_fingerprint = None
+                    prev_in_game = True
                     with self._last_track_lock:
                         manual_fingerprint_running = self._manual_fingerprint_running
                     if manual_fingerprint_running:
@@ -316,6 +322,11 @@ class Tracker:
                         finally:
                             self._fingerprint_lock.release()
                 else:
+                    if prev_in_game:
+                        # Game just stopped — hide the meters strip.
+                        self._emit("game_stopped")
+                        detector._last_fingerprint = None
+                    prev_in_game = False
                     track = get_smtc_track_sync(ignored_apps=config.get_smtc_ignored_apps())
                     if track and track.get("excluded"):
                         if self._try_set_last_track(track, game=None):

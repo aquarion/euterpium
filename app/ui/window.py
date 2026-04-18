@@ -74,6 +74,9 @@ class MainWindow:
     def update_metrics(self, result: "CheckResult"):
         self._queue.put(("metrics", result))
 
+    def hide_meters(self):
+        self._queue.put(("game_stopped",))
+
     def show(self):
         self._queue.put(("show",))
 
@@ -119,6 +122,9 @@ class MainWindow:
         elif kind == "metrics":
             _, result = msg
             self._update_meters(result)
+        elif kind == "game_stopped":
+            self._last_metrics = None
+            self._meters_frame.pack_forget()
         elif kind == "show":
             self._show()
         elif kind == "hide":
