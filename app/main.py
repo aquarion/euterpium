@@ -2,6 +2,7 @@
 
 import logging
 import queue
+import sys
 import threading
 
 import config
@@ -15,9 +16,11 @@ from updater import UpdateManager, cleanup_stale_update_dirs
 from version import __display_version__, __version__
 
 # Configure logging before any local imports so module-level log messages
-# (e.g. winsdk availability) are captured from the start
+# (e.g. winsdk availability) are captured from the start.
+# Default to DEBUG when running from source; packaged builds use config.
+_default_log_level = logging.INFO if getattr(sys, "frozen", False) else logging.DEBUG
 logging.basicConfig(
-    level=logging.INFO,
+    level=_default_log_level,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%H:%M:%S",
 )
@@ -25,7 +28,9 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    logging.getLogger().setLevel(config.get_log_level())
+    # Packaged builds use config file for log level; dev runs default to DEBUG (set at module level).
+    if getattr(sys, "frozen", False):
+        logging.getLogger().setLevel(config.get_log_level())
     logger.info("Starting Euterpium %s", __version__)
 
     # Report winsdk status now that logging is definitely active
