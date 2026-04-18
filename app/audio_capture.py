@@ -112,6 +112,7 @@ def compute_spectral_fingerprint(audio: np.ndarray, n_bands: int = 32) -> np.nda
     Uses logarithmically-spaced frequency bands to match pitch perception.
     Mixes stereo to mono before computing.
     """
+    n_bands = max(1, n_bands)
     if audio.ndim > 1:
         audio = audio.mean(axis=1)
     magnitudes = np.abs(np.fft.rfft(audio))
@@ -198,8 +199,6 @@ class AudioChangeDetector:
                 f"AudioChangeDetector: rms={rms:.3f} flatness={flatness:.2f} [noise] → skip"
             )
             return CheckResult(changed=False, rms=rms, flatness=flatness)
-
-        n_bands = max(1, n_bands)
 
         # ── Fingerprint comparison ─────────────────────────────────────────
         fingerprint = compute_spectral_fingerprint(audio, n_bands)

@@ -166,7 +166,7 @@ Mock `get_loopback_device` to inject synthetic audio (consistent with existing t
 |---|---|
 | Noise audio | Returns False, no fingerprint stored |
 | Silent audio | Returns False, state reset |
-| First musical sample | Returns False (no prior fingerprint), fingerprint stored |
+| First musical sample | Returns True (initial detection — triggers recognition), fingerprint stored |
 | Second musical sample, similar spectrum | Returns False |
 | Second musical sample, different spectrum | Returns True |
 
