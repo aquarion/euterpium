@@ -71,6 +71,9 @@ class MainWindow:
     def set_available_update(self, update_info: "AvailableUpdate | None"):
         self._queue.put(("update_state", update_info))
 
+    def update_metrics(self, result: "CheckResult"):
+        self._queue.put(("metrics", result))
+
     def show(self):
         self._queue.put(("show",))
 

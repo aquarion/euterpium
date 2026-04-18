@@ -138,6 +138,10 @@ def main():
                 window.log_status(message, level="error")
                 logger.error(message)
 
+            elif kind == "metrics":
+                _, result = msg
+                window.update_metrics(result)
+
             elif kind == "update_checked":
                 _, update = msg
                 # Always sync tray state — clears stale "Install update" when update is None.
