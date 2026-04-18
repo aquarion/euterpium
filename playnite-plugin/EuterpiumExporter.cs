@@ -48,7 +48,8 @@ namespace EuterpiumExporter
 
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
-            logger.Info($"EuterpiumExporter: ready — API at {_apiBaseUrl}/api/");
+            var version = ReadPluginVersion();
+            logger.Info($"EuterpiumExporter v{version} ready — API at {_apiBaseUrl}/api/");
 
             // Remove legacy file written by the old file-based integration (pre-REST API).
             try
@@ -322,6 +323,29 @@ namespace EuterpiumExporter
             if (int.TryParse(raw, out int port) && port >= 1024 && port <= 65535)
                 return port;
             return 43174;
+        }
+
+        /// <summary>
+        /// Reads the Version field from extension.yaml, which is deployed alongside the DLL.
+        /// Returns "unknown" if the file is absent or the field can't be parsed.
+        /// </summary>
+        private static string ReadPluginVersion()
+        {
+            try
+            {
+                var yamlPath = Path.Combine(
+                    Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location),
+                    "extension.yaml"
+                );
+                foreach (var line in File.ReadLines(yamlPath))
+                {
+                    var trimmed = line.Trim();
+                    if (trimmed.StartsWith("Version:", StringComparison.OrdinalIgnoreCase))
+                        return trimmed.Substring("Version:".Length).Trim();
+                }
+            }
+            catch { }
+            return "unknown";
         }
 
         /// <summary>
