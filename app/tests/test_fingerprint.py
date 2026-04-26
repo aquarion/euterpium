@@ -7,7 +7,13 @@ import hmac
 import pytest
 
 import fingerprint
-from fingerprint import _build_signature
+from fingerprint import (
+    _build_signature,
+    _dominant_script,
+    _pick_field,
+    _pick_lang,
+    _preferred_script,
+)
 
 # ── Signature generation ──────────────────────────────────────────────────────
 
@@ -66,6 +72,7 @@ def configured_credentials(monkeypatch):
     monkeypatch.setattr(fingerprint.config, "get_acrcloud_access_secret", lambda: "mysecret")
     monkeypatch.setattr(fingerprint.config, "get_acrcloud_host", lambda: "identify.acrcloud.com")
     monkeypatch.setattr(fingerprint.time, "time", lambda: 1700000000)
+    monkeypatch.setattr(fingerprint.config, "get_acrcloud_language", lambda: "en")
 
 
 def _make_response(json_data, status_code=200):
@@ -197,3 +204,373 @@ def test_identify_audio_posts_to_correct_url(monkeypatch, configured_credentials
     fingerprint.identify_audio(b"audio")
 
     assert posted_urls == ["https://identify.acrcloud.com/v1/identify"]
+
+
+# ── _dominant_script ──────────────────────────────────────────────────────────
+
+
+def test_dominant_script_latin():
+    assert _dominant_script("Masayoshi Soken") == "latin"
+
+
+def test_dominant_script_cjk_kanji():
+    assert _dominant_script("祖堅正慶") == "cjk"
+
+
+def test_dominant_script_cjk_hiragana():
+    assert _dominant_script("あいうえお") == "cjk"
+
+
+def test_dominant_script_hangul():
+    assert _dominant_script("마마무") == "hangul"
+
+
+def test_dominant_script_cyrillic():
+    assert _dominant_script("Земфира") == "cyrillic"
+
+
+def test_dominant_script_unknown_for_punctuation():
+    assert _dominant_script("!!!") == "unknown"
+
+
+def test_dominant_script_empty_string():
+    assert _dominant_script("") == "unknown"
+
+
+# ── _preferred_script ─────────────────────────────────────────────────────────
+
+
+def test_preferred_script_en_is_latin():
+    assert _preferred_script("en") == "latin"
+
+
+def test_preferred_script_en_gb_is_latin():
+    assert _preferred_script("en-GB") == "latin"
+
+
+def test_preferred_script_ja_is_cjk():
+    assert _preferred_script("ja") == "cjk"
+
+
+def test_preferred_script_zh_hans_is_cjk():
+    assert _preferred_script("zh-Hans") == "cjk"
+
+
+def test_preferred_script_zh_hans_cn_is_cjk():
+    assert _preferred_script("zh-Hans-CN") == "cjk"
+
+
+def test_preferred_script_ko_is_hangul():
+    assert _preferred_script("ko") == "hangul"
+
+
+def test_preferred_script_ru_is_cyrillic():
+    assert _preferred_script("ru") == "cyrillic"
+
+
+def test_preferred_script_unknown_code_defaults_to_latin():
+    assert _preferred_script("xx-Unknown") == "latin"
+
+
+def test_preferred_script_empty_string_defaults_to_latin():
+    assert _preferred_script("") == "latin"
+
+
+# ── _pick_lang ────────────────────────────────────────────────────────────────
+
+
+def test_pick_lang_exact_match():
+    langs = [{"code": "zh-Hans", "name": "你好"}]
+    assert _pick_lang("Hello", langs, "zh-Hans") == ("你好", True)
+
+
+def test_pick_lang_prefix_match_strips_region():
+    langs = [{"code": "en", "name": "Hello"}]
+    assert _pick_lang("Hola", langs, "en-GB") == ("Hello", True)
+
+
+def test_pick_lang_multi_level_strip():
+    langs = [{"code": "zh-Hans", "name": "你好"}]
+    assert _pick_lang("Hello", langs, "zh-Hans-CN") == ("你好", True)
+
+
+def test_pick_lang_no_match_returns_primary():
+    langs = [{"code": "ja", "name": "こんにちは"}]
+    assert _pick_lang("Hello", langs, "en") == ("Hello", False)
+
+
+def test_pick_lang_empty_langs_returns_primary():
+    assert _pick_lang("Hello", [], "en") == ("Hello", False)
+
+
+def test_pick_lang_empty_preferred_returns_primary():
+    langs = [{"code": "en", "name": "Hello"}]
+    assert _pick_lang("Hola", langs, "") == ("Hola", False)
+
+
+def test_pick_lang_skips_entry_with_missing_name():
+    langs = [{"code": "en"}, {"code": "en", "name": "Hello"}]
+    assert _pick_lang("Hola", langs, "en") == ("Hello", True)
+
+
+def test_pick_lang_falls_back_when_only_match_has_missing_name():
+    langs = [{"code": "en"}]
+    assert _pick_lang("Hola", langs, "en") == ("Hola", False)
+
+
+def test_pick_lang_match_takes_priority_over_script():
+    # langs entry tagged "en" but content is CJK — should still be returned because
+    # the langs match takes priority over script scanning per the spec.
+    langs = [{"code": "en", "name": "你好"}]
+    assert _pick_lang("Hola", langs, "en") == ("你好", True)
+
+
+# ── _pick_field ───────────────────────────────────────────────────────────────
+
+
+def test_pick_field_returns_entry_in_preferred_script():
+    entries = [
+        {"title": "祖堅正慶"},
+        {"title": "Masayoshi Soken"},
+    ]
+    assert _pick_field(entries, lambda e: e["title"], "latin") == "Masayoshi Soken"
+
+
+def test_pick_field_falls_back_to_first_when_no_match():
+    entries = [
+        {"title": "祖堅正慶"},
+        {"title": "最終幻想"},
+    ]
+    assert _pick_field(entries, lambda e: e["title"], "latin") == "祖堅正慶"
+
+
+def test_pick_field_returns_first_when_it_already_matches():
+    entries = [
+        {"title": "Masayoshi Soken"},
+        {"title": "祖堅正慶"},
+    ]
+    assert _pick_field(entries, lambda e: e["title"], "latin") == "Masayoshi Soken"
+
+
+# ── identify_audio — language selection ──────────────────────────────────────
+
+
+def test_identify_audio_picks_title_from_langs(monkeypatch, configured_credentials):
+    response = _make_response(
+        {
+            "status": {"code": 0, "msg": "Success"},
+            "metadata": {
+                "music": [
+                    {
+                        "title": "你好",
+                        "langs": [{"code": "en", "name": "Hello"}],
+                        "artists": [{"name": "Artist"}],
+                        "album": {"name": "Album"},
+                        "release_date": "",
+                        "acrid": "abc",
+                        "external_metadata": {},
+                    }
+                ]
+            },
+        }
+    )
+    monkeypatch.setattr(fingerprint.requests, "post", lambda *a, **kw: response)
+    monkeypatch.setattr(fingerprint.config, "get_acrcloud_language", lambda: "en")
+
+    result = fingerprint.identify_audio(b"audio")
+    assert result["title"] == "Hello"
+
+
+def test_identify_audio_picks_artist_by_script_scan(monkeypatch, configured_credentials):
+    response = _make_response(
+        {
+            "status": {"code": 0, "msg": "Success"},
+            "metadata": {
+                "music": [
+                    {
+                        "title": "The Aetherial Sea",
+                        "artists": [{"name": "祖堅正慶"}],
+                        "album": {"name": "ENDWALKER: FINAL FANTASY XIV Original Soundtrack"},
+                        "release_date": "2022-02-23",
+                        "acrid": "abc1",
+                        "external_metadata": {},
+                    },
+                    {
+                        "title": "The Aetherial Sea",
+                        "artists": [{"name": "Masayoshi Soken"}],
+                        "album": {"name": "ENDWALKER: FINAL FANTASY XIV Original Soundtrack"},
+                        "release_date": "2022-02-23",
+                        "acrid": "abc2",
+                        "external_metadata": {},
+                    },
+                ]
+            },
+        }
+    )
+    monkeypatch.setattr(fingerprint.requests, "post", lambda *a, **kw: response)
+    monkeypatch.setattr(fingerprint.config, "get_acrcloud_language", lambda: "en")
+
+    result = fingerprint.identify_audio(b"audio")
+    assert result["artist"] == "Masayoshi Soken"
+
+
+def test_identify_audio_script_scan_falls_back_to_first_entry(monkeypatch, configured_credentials):
+    response = _make_response(
+        {
+            "status": {"code": 0, "msg": "Success"},
+            "metadata": {
+                "music": [
+                    {
+                        "title": "曲名",
+                        "artists": [{"name": "アーティスト"}],
+                        "album": {"name": "アルバム"},
+                        "release_date": "",
+                        "acrid": "abc",
+                        "external_metadata": {},
+                    }
+                ]
+            },
+        }
+    )
+    monkeypatch.setattr(fingerprint.requests, "post", lambda *a, **kw: response)
+    monkeypatch.setattr(fingerprint.config, "get_acrcloud_language", lambda: "en")
+
+    result = fingerprint.identify_audio(b"audio")
+    assert result["artist"] == "アーティスト"
+
+
+def test_identify_audio_langs_title_and_script_scan_artist(monkeypatch, configured_credentials):
+    response = _make_response(
+        {
+            "status": {"code": 0, "msg": "Success"},
+            "metadata": {
+                "music": [
+                    {
+                        "title": "你好",
+                        "langs": [{"code": "en", "name": "Hello"}],
+                        "artists": [{"name": "祖堅正慶"}],
+                        "album": {"name": "Album"},
+                        "release_date": "",
+                        "acrid": "abc1",
+                        "external_metadata": {},
+                    },
+                    {
+                        "title": "你好",
+                        "artists": [{"name": "Masayoshi Soken"}],
+                        "album": {"name": "Album"},
+                        "release_date": "",
+                        "acrid": "abc2",
+                        "external_metadata": {},
+                    },
+                ]
+            },
+        }
+    )
+    monkeypatch.setattr(fingerprint.requests, "post", lambda *a, **kw: response)
+    monkeypatch.setattr(fingerprint.config, "get_acrcloud_language", lambda: "en")
+
+    result = fingerprint.identify_audio(b"audio")
+    assert result["title"] == "Hello"
+    assert result["artist"] == "Masayoshi Soken"
+
+
+def test_identify_audio_skips_script_scan_when_langs_matches(monkeypatch, configured_credentials):
+    # Even when the langs match returns content in the "wrong" script,
+    # the script-scan pass must be skipped because the langs pass took priority.
+    response = _make_response(
+        {
+            "status": {"code": 0, "msg": "Success"},
+            "metadata": {
+                "music": [
+                    {
+                        "title": "Hola",
+                        "langs": [{"code": "en", "name": "你好"}],
+                        "artists": [{"name": "Artist"}],
+                        "album": {"name": "Album"},
+                        "release_date": "",
+                        "acrid": "abc1",
+                        "external_metadata": {},
+                    },
+                    {
+                        "title": "English Title",
+                        "artists": [{"name": "Artist"}],
+                        "album": {"name": "Album"},
+                        "release_date": "",
+                        "acrid": "abc2",
+                        "external_metadata": {},
+                    },
+                ]
+            },
+        }
+    )
+    monkeypatch.setattr(fingerprint.requests, "post", lambda *a, **kw: response)
+    monkeypatch.setattr(fingerprint.config, "get_acrcloud_language", lambda: "en")
+
+    result = fingerprint.identify_audio(b"audio")
+    # Title from langs match wins, even though it's CJK and preferred is en/latin.
+    assert result["title"] == "你好"
+
+
+def test_identify_audio_filters_empty_artist_names(monkeypatch, configured_credentials):
+    response = _make_response(
+        {
+            "status": {"code": 0, "msg": "Success"},
+            "metadata": {
+                "music": [
+                    {
+                        "title": "Song",
+                        "artists": [{}, {"name": "Real Artist"}, {"name": ""}],
+                        "album": {"name": "Album"},
+                        "release_date": "",
+                        "acrid": "abc",
+                        "external_metadata": {},
+                    }
+                ]
+            },
+        }
+    )
+    monkeypatch.setattr(fingerprint.requests, "post", lambda *a, **kw: response)
+    monkeypatch.setattr(fingerprint.config, "get_acrcloud_language", lambda: "en")
+
+    result = fingerprint.identify_audio(b"audio")
+    assert result["artist"] == "Real Artist"
+
+
+def test_identify_audio_keeps_partial_artist_langs_match(monkeypatch, configured_credentials):
+    # When at least one artist has a langs match, the script-scan fallback
+    # must not run — otherwise it would discard the localized name.
+    response = _make_response(
+        {
+            "status": {"code": 0, "msg": "Success"},
+            "metadata": {
+                "music": [
+                    {
+                        "title": "Song",
+                        "artists": [
+                            {"name": "Primary", "langs": [{"code": "en", "name": "Localized"}]},
+                            {"name": "祖堅正慶"},
+                        ],
+                        "album": {"name": "Album"},
+                        "release_date": "",
+                        "acrid": "abc1",
+                        "external_metadata": {},
+                    },
+                    {
+                        "title": "Song",
+                        "artists": [{"name": "Other Latin Artist"}],
+                        "album": {"name": "Album"},
+                        "release_date": "",
+                        "acrid": "abc2",
+                        "external_metadata": {},
+                    },
+                ]
+            },
+        }
+    )
+    monkeypatch.setattr(fingerprint.requests, "post", lambda *a, **kw: response)
+    monkeypatch.setattr(fingerprint.config, "get_acrcloud_language", lambda: "en")
+
+    result = fingerprint.identify_audio(b"audio")
+    # The langs match for the first artist must be preserved — the script-scan
+    # fallback must not replace the joined string with music[1]'s artist.
+    assert result["artist"] == "Localized, 祖堅正慶"
