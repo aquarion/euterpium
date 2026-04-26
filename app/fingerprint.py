@@ -143,15 +143,38 @@ def identify_audio(wav_bytes: bytes) -> dict | None:
         return None
 
     try:
-        music = result["metadata"]["music"][0]
-        artists = ", ".join(a["name"] for a in music.get("artists", []))
+        music_list = result["metadata"]["music"]
+        music = music_list[0]
+
+        preferred_lang = config.get_acrcloud_language()
+        preferred_script = _preferred_script(preferred_lang)
+
+        def _artist_str(entry: dict) -> str:
+            return ", ".join(a["name"] for a in entry.get("artists", []))
+
+        title = _pick_lang(music.get("title", ""), music.get("langs", []), preferred_lang)
+        if _dominant_script(title) != preferred_script:
+            title = _pick_field(music_list, lambda e: e.get("title", ""), preferred_script)
+
+        artist = ", ".join(
+            _pick_lang(a["name"], a.get("langs", []), preferred_lang)
+            for a in music.get("artists", [])
+        )
+        if _dominant_script(artist) != preferred_script:
+            artist = _pick_field(music_list, _artist_str, preferred_script)
+
         album_info = music.get("album", {})
+        album = _pick_lang(album_info.get("name", ""), album_info.get("langs", []), preferred_lang)
+        if _dominant_script(album) != preferred_script:
+            album = _pick_field(
+                music_list, lambda e: e.get("album", {}).get("name", ""), preferred_script
+            )
 
         return {
             "source": "acrcloud",
-            "title": music.get("title", ""),
-            "artist": artists,
-            "album": album_info.get("name", ""),
+            "title": title,
+            "artist": artist,
+            "album": album,
             "release_date": music.get("release_date", ""),
             "acrid": music.get("acrid", ""),
             "streaming_links": music.get("external_metadata", {}),

@@ -342,3 +342,125 @@ def test_pick_field_returns_first_when_it_already_matches():
         {"title": "祖堅正慶"},
     ]
     assert _pick_field(entries, lambda e: e["title"], "latin") == "Masayoshi Soken"
+
+
+# ── identify_audio — language selection ──────────────────────────────────────
+
+
+def test_identify_audio_picks_title_from_langs(monkeypatch, configured_credentials):
+    response = _make_response(
+        {
+            "status": {"code": 0, "msg": "Success"},
+            "metadata": {
+                "music": [
+                    {
+                        "title": "你好",
+                        "langs": [{"code": "en", "name": "Hello"}],
+                        "artists": [{"name": "Artist"}],
+                        "album": {"name": "Album"},
+                        "release_date": "",
+                        "acrid": "abc",
+                        "external_metadata": {},
+                    }
+                ]
+            },
+        }
+    )
+    monkeypatch.setattr(fingerprint.requests, "post", lambda *a, **kw: response)
+    monkeypatch.setattr(fingerprint.config, "get_acrcloud_language", lambda: "en")
+
+    result = fingerprint.identify_audio(b"audio")
+    assert result["title"] == "Hello"
+
+
+def test_identify_audio_picks_artist_by_script_scan(monkeypatch, configured_credentials):
+    response = _make_response(
+        {
+            "status": {"code": 0, "msg": "Success"},
+            "metadata": {
+                "music": [
+                    {
+                        "title": "The Aetherial Sea",
+                        "artists": [{"name": "祖堅正慶"}],
+                        "album": {"name": "ENDWALKER: FINAL FANTASY XIV Original Soundtrack"},
+                        "release_date": "2022-02-23",
+                        "acrid": "abc1",
+                        "external_metadata": {},
+                    },
+                    {
+                        "title": "The Aetherial Sea",
+                        "artists": [{"name": "Masayoshi Soken"}],
+                        "album": {"name": "ENDWALKER: FINAL FANTASY XIV Original Soundtrack"},
+                        "release_date": "2022-02-23",
+                        "acrid": "abc2",
+                        "external_metadata": {},
+                    },
+                ]
+            },
+        }
+    )
+    monkeypatch.setattr(fingerprint.requests, "post", lambda *a, **kw: response)
+    monkeypatch.setattr(fingerprint.config, "get_acrcloud_language", lambda: "en")
+
+    result = fingerprint.identify_audio(b"audio")
+    assert result["artist"] == "Masayoshi Soken"
+
+
+def test_identify_audio_script_scan_falls_back_to_first_entry(monkeypatch, configured_credentials):
+    response = _make_response(
+        {
+            "status": {"code": 0, "msg": "Success"},
+            "metadata": {
+                "music": [
+                    {
+                        "title": "曲名",
+                        "artists": [{"name": "アーティスト"}],
+                        "album": {"name": "アルバム"},
+                        "release_date": "",
+                        "acrid": "abc",
+                        "external_metadata": {},
+                    }
+                ]
+            },
+        }
+    )
+    monkeypatch.setattr(fingerprint.requests, "post", lambda *a, **kw: response)
+    monkeypatch.setattr(fingerprint.config, "get_acrcloud_language", lambda: "en")
+
+    result = fingerprint.identify_audio(b"audio")
+    assert result["artist"] == "アーティスト"
+
+
+def test_identify_audio_langs_title_and_script_scan_artist(monkeypatch, configured_credentials):
+    response = _make_response(
+        {
+            "status": {"code": 0, "msg": "Success"},
+            "metadata": {
+                "music": [
+                    {
+                        "title": "你好",
+                        "langs": [{"code": "en", "name": "Hello"}],
+                        "artists": [{"name": "祖堅正慶"}],
+                        "album": {"name": "Album"},
+                        "release_date": "",
+                        "acrid": "abc1",
+                        "external_metadata": {},
+                    },
+                    {
+                        "title": "你好",
+                        "artists": [{"name": "Masayoshi Soken"}],
+                        "album": {"name": "Album"},
+                        "release_date": "",
+                        "acrid": "abc2",
+                        "external_metadata": {},
+                    },
+                ]
+            },
+        }
+    )
+    monkeypatch.setattr(fingerprint.requests, "post", lambda *a, **kw: response)
+    monkeypatch.setattr(fingerprint.config, "get_acrcloud_language", lambda: "en")
+
+    result = fingerprint.identify_audio(b"audio")
+    assert result["title"] == "Hello"
+    assert result["artist"] == "Masayoshi Soken"
