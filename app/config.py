@@ -155,6 +155,24 @@ def get_acrcloud_access_secret() -> str:
     return _cfg().get("acrcloud", "access_secret", fallback="")
 
 
+def get_acrcloud_language() -> str:
+    """Returns the preferred language code for ACRCloud results.
+
+    Priority: [acrcloud] language in INI → Windows locale → 'en'.
+    """
+    explicit = _cfg().get("acrcloud", "language", fallback="").strip()
+    if explicit:
+        return explicit
+    try:
+        import winreg
+
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Control Panel\International") as key:
+            value, _ = winreg.QueryValueEx(key, "LocaleName")
+            return value.strip() if value.strip() else "en"
+    except Exception:
+        return "en"
+
+
 # ── Your API ──────────────────────────────────────────────────────────────────
 
 
