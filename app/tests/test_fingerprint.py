@@ -7,7 +7,7 @@ import hmac
 import pytest
 
 import fingerprint
-from fingerprint import _build_signature, _dominant_script, _preferred_script
+from fingerprint import _build_signature, _dominant_script, _pick_lang, _preferred_script
 
 # ── Signature generation ──────────────────────────────────────────────────────
 
@@ -267,3 +267,35 @@ def test_preferred_script_unknown_code_defaults_to_latin():
 
 def test_preferred_script_empty_string_defaults_to_latin():
     assert _preferred_script("") == "latin"
+
+
+# ── _pick_lang ────────────────────────────────────────────────────────────────
+
+
+def test_pick_lang_exact_match():
+    langs = [{"code": "zh-Hans", "name": "你好"}]
+    assert _pick_lang("Hello", langs, "zh-Hans") == "你好"
+
+
+def test_pick_lang_prefix_match_strips_region():
+    langs = [{"code": "en", "name": "Hello"}]
+    assert _pick_lang("Hola", langs, "en-GB") == "Hello"
+
+
+def test_pick_lang_multi_level_strip():
+    langs = [{"code": "zh-Hans", "name": "你好"}]
+    assert _pick_lang("Hello", langs, "zh-Hans-CN") == "你好"
+
+
+def test_pick_lang_no_match_returns_primary():
+    langs = [{"code": "ja", "name": "こんにちは"}]
+    assert _pick_lang("Hello", langs, "en") == "Hello"
+
+
+def test_pick_lang_empty_langs_returns_primary():
+    assert _pick_lang("Hello", [], "en") == "Hello"
+
+
+def test_pick_lang_empty_preferred_returns_primary():
+    langs = [{"code": "en", "name": "Hello"}]
+    assert _pick_lang("Hola", langs, "") == "Hola"

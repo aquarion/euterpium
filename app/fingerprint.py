@@ -62,6 +62,20 @@ def _preferred_script(lang_code: str) -> str:
     return "latin"
 
 
+def _pick_lang(primary: str, langs: list[dict], preferred: str) -> str:
+    if not langs or not preferred:
+        return primary
+    candidate = preferred
+    while candidate:
+        for entry in langs:
+            if entry.get("code", "").lower() == candidate.lower():
+                return entry["name"]
+        if "-" not in candidate:
+            break
+        candidate = candidate.rsplit("-", 1)[0]
+    return primary
+
+
 def identify_audio(wav_bytes: bytes) -> dict | None:
     """
     Sends WAV audio bytes to ACRCloud for identification.
