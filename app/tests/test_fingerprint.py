@@ -72,6 +72,7 @@ def configured_credentials(monkeypatch):
     monkeypatch.setattr(fingerprint.config, "get_acrcloud_access_secret", lambda: "mysecret")
     monkeypatch.setattr(fingerprint.config, "get_acrcloud_host", lambda: "identify.acrcloud.com")
     monkeypatch.setattr(fingerprint.time, "time", lambda: 1700000000)
+    monkeypatch.setattr(fingerprint.config, "get_acrcloud_language", lambda: "en")
 
 
 def _make_response(json_data, status_code=200):

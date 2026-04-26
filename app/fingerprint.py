@@ -150,14 +150,14 @@ def identify_audio(wav_bytes: bytes) -> dict | None:
         preferred_script = _preferred_script(preferred_lang)
 
         def _artist_str(entry: dict) -> str:
-            return ", ".join(a["name"] for a in entry.get("artists", []))
+            return ", ".join(a.get("name", "") for a in entry.get("artists", []))
 
         title = _pick_lang(music.get("title", ""), music.get("langs", []), preferred_lang)
         if _dominant_script(title) != preferred_script:
             title = _pick_field(music_list, lambda e: e.get("title", ""), preferred_script)
 
         artist = ", ".join(
-            _pick_lang(a["name"], a.get("langs", []), preferred_lang)
+            _pick_lang(a.get("name", ""), a.get("langs", []), preferred_lang)
             for a in music.get("artists", [])
         )
         if _dominant_script(artist) != preferred_script:
