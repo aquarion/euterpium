@@ -69,7 +69,9 @@ def _pick_lang(primary: str, langs: list[dict], preferred: str) -> str:
     while candidate:
         for entry in langs:
             if entry.get("code", "").lower() == candidate.lower():
-                return entry["name"]
+                name = entry.get("name")
+                if name:
+                    return name
         if "-" not in candidate:
             break
         candidate = candidate.rsplit("-", 1)[0]

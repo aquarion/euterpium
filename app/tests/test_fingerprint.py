@@ -307,6 +307,16 @@ def test_pick_lang_empty_preferred_returns_primary():
     assert _pick_lang("Hola", langs, "") == "Hola"
 
 
+def test_pick_lang_skips_entry_with_missing_name():
+    langs = [{"code": "en"}, {"code": "en", "name": "Hello"}]
+    assert _pick_lang("Hola", langs, "en") == "Hello"
+
+
+def test_pick_lang_falls_back_when_only_match_has_missing_name():
+    langs = [{"code": "en"}]
+    assert _pick_lang("Hola", langs, "en") == "Hola"
+
+
 # ── _pick_field ───────────────────────────────────────────────────────────────
 
 
