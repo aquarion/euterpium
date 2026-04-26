@@ -7,7 +7,7 @@ import hmac
 import pytest
 
 import fingerprint
-from fingerprint import _build_signature
+from fingerprint import _build_signature, _dominant_script
 
 # ── Signature generation ──────────────────────────────────────────────────────
 
@@ -197,3 +197,34 @@ def test_identify_audio_posts_to_correct_url(monkeypatch, configured_credentials
     fingerprint.identify_audio(b"audio")
 
     assert posted_urls == ["https://identify.acrcloud.com/v1/identify"]
+
+
+# ── _dominant_script ──────────────────────────────────────────────────────────
+
+
+def test_dominant_script_latin():
+    assert _dominant_script("Masayoshi Soken") == "latin"
+
+
+def test_dominant_script_cjk_kanji():
+    assert _dominant_script("祖堅正慶") == "cjk"
+
+
+def test_dominant_script_cjk_hiragana():
+    assert _dominant_script("あいうえお") == "cjk"
+
+
+def test_dominant_script_hangul():
+    assert _dominant_script("마마무") == "hangul"
+
+
+def test_dominant_script_cyrillic():
+    assert _dominant_script("Земфира") == "cyrillic"
+
+
+def test_dominant_script_unknown_for_punctuation():
+    assert _dominant_script("!!!") == "unknown"
+
+
+def test_dominant_script_empty_string():
+    assert _dominant_script("") == "unknown"

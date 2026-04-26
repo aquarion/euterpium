@@ -30,6 +30,23 @@ def _build_signature(timestamp: str, access_key: str, access_secret: str) -> str
     return base64.b64encode(signature.digest()).decode("utf-8")
 
 
+def _dominant_script(text: str) -> str:
+    counts: dict[str, int] = {"latin": 0, "cjk": 0, "hangul": 0, "cyrillic": 0}
+    for ch in text:
+        cp = ord(ch)
+        if 0x0041 <= cp <= 0x024F:
+            counts["latin"] += 1
+        elif 0x3040 <= cp <= 0x30FF or 0x3400 <= cp <= 0x4DBF or 0x4E00 <= cp <= 0x9FFF:
+            counts["cjk"] += 1
+        elif 0x1100 <= cp <= 0x11FF or 0xAC00 <= cp <= 0xD7AF:
+            counts["hangul"] += 1
+        elif 0x0400 <= cp <= 0x04FF:
+            counts["cyrillic"] += 1
+    if not any(counts.values()):
+        return "unknown"
+    return max(counts, key=counts.get)
+
+
 def identify_audio(wav_bytes: bytes) -> dict | None:
     """
     Sends WAV audio bytes to ACRCloud for identification.
