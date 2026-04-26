@@ -44,7 +44,7 @@ In practice, `langs` on artist/album is less common; the more frequent case is m
 1. Read `[acrcloud] language` from INI. If non-empty, return it.
 2. Lazy-import `winreg` (startup.py pattern — Windows-only module).
 3. Read `HKCU\Control Panel\International\LocaleName`.
-4. Return the registry value, or `"en"` on any failure.
+4. Return the registry value, or `"en"` if importing/reading the registry raises `ImportError` or `OSError`, or if the value is not a non-empty string.
 
 ### `fingerprint._pick_lang(primary: str, langs: list[dict], preferred: str) -> tuple[str, bool]`
 
@@ -99,9 +99,11 @@ Call `config.get_acrcloud_language()` and `_preferred_script()` once per invocat
 For each of title, artist names, and album name — two-pass selection:
 
 1. **`langs` pass**: apply `_pick_lang` to the `music[0]` field + its `langs` array, capturing the `(value, matched)` tuple.
-2. **Script pass**: only if `matched` is False *and* the result's dominant script does not match the preferred script, use `_pick_field` to scan all `music[]` entries for one in the preferred script.
+2. **Script pass**: only if no `langs` match was found *and* the result's dominant script does not match the preferred script, use `_pick_field` to scan all `music[]` entries for one in the preferred script.
 
 The `langs` pass takes priority — if it finds a match, the script scan is skipped for that field.
+
+**Artist field nuance:** `music[0].artists[]` is a list, so `_pick_lang` runs per-artist and the joined string is built from the per-artist results. The script-scan fallback runs only if **none** of the artists had a `langs` match — using "any matched" rather than "all matched" preserves localized artist names even when other artists in the list lack a `langs` array. Falsy artist names are filtered before joining to avoid stray separators.
 
 ### `euterpium.ini` — bundled default
 
@@ -161,6 +163,9 @@ Add a commented-out key to the `[acrcloud]` section:
 - **Script scan for artist**: fixture with two `music[]` entries — `[0]` has Japanese artist, `[1]` has English artist; preferred language `en`; assert English artist returned.
 - **Script scan fallback**: fixture where no entry matches preferred script; assert `music[0]` artist returned.
 - **Script scan + `langs` together**: fixture where title has a `langs` match but artist requires script scan; assert both resolved correctly.
+- **`langs` match outranks script mismatch**: fixture where the `langs` entry is labeled `en` but the localized name is in CJK; assert the langs match is returned and the script-scan pass is skipped.
+- **Falsy artist names are filtered**: fixture with `[{}, {"name": "Real Artist"}, {"name": ""}]`; assert no stray separators in the joined output.
+- **Partial artist langs match preserved**: fixture with one langs-matched artist and one without; assert the localized artist name is preserved (the script-scan must not run when *any* artist matched via langs).
 
 ### `test_config.py` — `get_acrcloud_language`
 
@@ -169,6 +174,7 @@ Add a commented-out key to the `[acrcloud]` section:
 | INI has explicit value | Returns INI value (no registry read) |
 | INI empty, registry returns `en-GB` | Returns `en-GB` |
 | INI empty, registry raises `OSError` | Returns `"en"` |
+| INI empty, registry returns non-string value | Returns `"en"` |
 
 ## Out of Scope
 

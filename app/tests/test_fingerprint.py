@@ -534,3 +534,43 @@ def test_identify_audio_filters_empty_artist_names(monkeypatch, configured_crede
 
     result = fingerprint.identify_audio(b"audio")
     assert result["artist"] == "Real Artist"
+
+
+def test_identify_audio_keeps_partial_artist_langs_match(monkeypatch, configured_credentials):
+    # When at least one artist has a langs match, the script-scan fallback
+    # must not run — otherwise it would discard the localized name.
+    response = _make_response(
+        {
+            "status": {"code": 0, "msg": "Success"},
+            "metadata": {
+                "music": [
+                    {
+                        "title": "Song",
+                        "artists": [
+                            {"name": "Primary", "langs": [{"code": "en", "name": "Localized"}]},
+                            {"name": "祖堅正慶"},
+                        ],
+                        "album": {"name": "Album"},
+                        "release_date": "",
+                        "acrid": "abc1",
+                        "external_metadata": {},
+                    },
+                    {
+                        "title": "Song",
+                        "artists": [{"name": "Other Latin Artist"}],
+                        "album": {"name": "Album"},
+                        "release_date": "",
+                        "acrid": "abc2",
+                        "external_metadata": {},
+                    },
+                ]
+            },
+        }
+    )
+    monkeypatch.setattr(fingerprint.requests, "post", lambda *a, **kw: response)
+    monkeypatch.setattr(fingerprint.config, "get_acrcloud_language", lambda: "en")
+
+    result = fingerprint.identify_audio(b"audio")
+    # The langs match for the first artist must be preserved — the script-scan
+    # fallback must not replace the joined string with music[1]'s artist.
+    assert result["artist"] == "Localized, 祖堅正慶"

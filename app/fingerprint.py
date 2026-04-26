@@ -163,8 +163,11 @@ def identify_audio(wav_bytes: bytes) -> dict | None:
             for a in music.get("artists", [])
         ]
         artist = ", ".join(value for value, _ in artist_results if value)
-        all_artists_matched = bool(artist_results) and all(matched for _, matched in artist_results)
-        if not all_artists_matched and _dominant_script(artist) != preferred_script:
+        # any (not all): if any artist had a langs match, preserve those
+        # localized names rather than letting _pick_field replace the joined
+        # string with a different music[] entry.
+        any_artist_matched = any(matched for _, matched in artist_results)
+        if not any_artist_matched and _dominant_script(artist) != preferred_script:
             artist = _pick_field(music_list, _artist_str, preferred_script)
 
         album_info = music.get("album", {})

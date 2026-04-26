@@ -103,10 +103,15 @@ def get_acrcloud_language() -> str:
 
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Control Panel\International") as key:
             value, _ = winreg.QueryValueEx(key, "LocaleName")
-            return value.strip() if value.strip() else "en"
-    except Exception:
+            if not isinstance(value, str):
+                return "en"
+            stripped = value.strip()
+            return stripped if stripped else "en"
+    except (ImportError, OSError):
         return "en"
 ```
+
+The narrow `(ImportError, OSError)` catch is consistent with the rest of `config.py` (specific exceptions, not bare `except Exception`). The `isinstance(value, str)` guard handles the realistic non-string failure mode (e.g. registry returns `None`) without re-broadening the catch.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -731,8 +736,8 @@ def identify_audio(wav_bytes: bytes) -> dict | None:
             for a in music.get("artists", [])
         ]
         artist = ", ".join(value for value, _ in artist_results if value)
-        all_artists_matched = bool(artist_results) and all(matched for _, matched in artist_results)
-        if not all_artists_matched and _dominant_script(artist) != preferred_script:
+        any_artist_matched = any(matched for _, matched in artist_results)
+        if not any_artist_matched and _dominant_script(artist) != preferred_script:
             artist = _pick_field(music_list, _artist_str, preferred_script)
 
         album_info = music.get("album", {})
