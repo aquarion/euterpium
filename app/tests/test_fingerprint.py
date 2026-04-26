@@ -281,41 +281,48 @@ def test_preferred_script_empty_string_defaults_to_latin():
 
 def test_pick_lang_exact_match():
     langs = [{"code": "zh-Hans", "name": "你好"}]
-    assert _pick_lang("Hello", langs, "zh-Hans") == "你好"
+    assert _pick_lang("Hello", langs, "zh-Hans") == ("你好", True)
 
 
 def test_pick_lang_prefix_match_strips_region():
     langs = [{"code": "en", "name": "Hello"}]
-    assert _pick_lang("Hola", langs, "en-GB") == "Hello"
+    assert _pick_lang("Hola", langs, "en-GB") == ("Hello", True)
 
 
 def test_pick_lang_multi_level_strip():
     langs = [{"code": "zh-Hans", "name": "你好"}]
-    assert _pick_lang("Hello", langs, "zh-Hans-CN") == "你好"
+    assert _pick_lang("Hello", langs, "zh-Hans-CN") == ("你好", True)
 
 
 def test_pick_lang_no_match_returns_primary():
     langs = [{"code": "ja", "name": "こんにちは"}]
-    assert _pick_lang("Hello", langs, "en") == "Hello"
+    assert _pick_lang("Hello", langs, "en") == ("Hello", False)
 
 
 def test_pick_lang_empty_langs_returns_primary():
-    assert _pick_lang("Hello", [], "en") == "Hello"
+    assert _pick_lang("Hello", [], "en") == ("Hello", False)
 
 
 def test_pick_lang_empty_preferred_returns_primary():
     langs = [{"code": "en", "name": "Hello"}]
-    assert _pick_lang("Hola", langs, "") == "Hola"
+    assert _pick_lang("Hola", langs, "") == ("Hola", False)
 
 
 def test_pick_lang_skips_entry_with_missing_name():
     langs = [{"code": "en"}, {"code": "en", "name": "Hello"}]
-    assert _pick_lang("Hola", langs, "en") == "Hello"
+    assert _pick_lang("Hola", langs, "en") == ("Hello", True)
 
 
 def test_pick_lang_falls_back_when_only_match_has_missing_name():
     langs = [{"code": "en"}]
-    assert _pick_lang("Hola", langs, "en") == "Hola"
+    assert _pick_lang("Hola", langs, "en") == ("Hola", False)
+
+
+def test_pick_lang_match_takes_priority_over_script():
+    # langs entry tagged "en" but content is CJK — should still be returned because
+    # the langs match takes priority over script scanning per the spec.
+    langs = [{"code": "en", "name": "你好"}]
+    assert _pick_lang("Hola", langs, "en") == ("你好", True)
 
 
 # ── _pick_field ───────────────────────────────────────────────────────────────
@@ -465,3 +472,40 @@ def test_identify_audio_langs_title_and_script_scan_artist(monkeypatch, configur
     result = fingerprint.identify_audio(b"audio")
     assert result["title"] == "Hello"
     assert result["artist"] == "Masayoshi Soken"
+
+
+def test_identify_audio_skips_script_scan_when_langs_matches(monkeypatch, configured_credentials):
+    # Even when the langs match returns content in the "wrong" script,
+    # the script-scan pass must be skipped because the langs pass took priority.
+    response = _make_response(
+        {
+            "status": {"code": 0, "msg": "Success"},
+            "metadata": {
+                "music": [
+                    {
+                        "title": "Hola",
+                        "langs": [{"code": "en", "name": "你好"}],
+                        "artists": [{"name": "Artist"}],
+                        "album": {"name": "Album"},
+                        "release_date": "",
+                        "acrid": "abc1",
+                        "external_metadata": {},
+                    },
+                    {
+                        "title": "English Title",
+                        "artists": [{"name": "Artist"}],
+                        "album": {"name": "Album"},
+                        "release_date": "",
+                        "acrid": "abc2",
+                        "external_metadata": {},
+                    },
+                ]
+            },
+        }
+    )
+    monkeypatch.setattr(fingerprint.requests, "post", lambda *a, **kw: response)
+    monkeypatch.setattr(fingerprint.config, "get_acrcloud_language", lambda: "en")
+
+    result = fingerprint.identify_audio(b"audio")
+    # Title from langs match wins, even though it's CJK and preferred is en/latin.
+    assert result["title"] == "你好"

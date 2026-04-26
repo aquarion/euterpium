@@ -62,20 +62,20 @@ def _preferred_script(lang_code: str) -> str:
     return "latin"
 
 
-def _pick_lang(primary: str, langs: list[dict], preferred: str) -> str:
+def _pick_lang(primary: str, langs: list[dict], preferred: str) -> tuple[str, bool]:
     if not langs or not preferred:
-        return primary
+        return primary, False
     candidate = preferred
     while candidate:
         for entry in langs:
             if entry.get("code", "").lower() == candidate.lower():
                 name = entry.get("name")
                 if name:
-                    return name
+                    return name, True
         if "-" not in candidate:
             break
         candidate = candidate.rsplit("-", 1)[0]
-    return primary
+    return primary, False
 
 
 def _pick_field(entries: list[dict], field_fn, preferred_script: str) -> str:
@@ -152,20 +152,26 @@ def identify_audio(wav_bytes: bytes) -> dict | None:
         def _artist_str(entry: dict) -> str:
             return ", ".join(a.get("name", "") for a in entry.get("artists", []))
 
-        title = _pick_lang(music.get("title", ""), music.get("langs", []), preferred_lang)
-        if _dominant_script(title) != preferred_script:
+        title, title_matched = _pick_lang(
+            music.get("title", ""), music.get("langs", []), preferred_lang
+        )
+        if not title_matched and _dominant_script(title) != preferred_script:
             title = _pick_field(music_list, lambda e: e.get("title", ""), preferred_script)
 
-        artist = ", ".join(
+        artist_results = [
             _pick_lang(a.get("name", ""), a.get("langs", []), preferred_lang)
             for a in music.get("artists", [])
-        )
-        if _dominant_script(artist) != preferred_script:
+        ]
+        artist = ", ".join(value for value, _ in artist_results)
+        all_artists_matched = bool(artist_results) and all(matched for _, matched in artist_results)
+        if not all_artists_matched and _dominant_script(artist) != preferred_script:
             artist = _pick_field(music_list, _artist_str, preferred_script)
 
         album_info = music.get("album", {})
-        album = _pick_lang(album_info.get("name", ""), album_info.get("langs", []), preferred_lang)
-        if _dominant_script(album) != preferred_script:
+        album, album_matched = _pick_lang(
+            album_info.get("name", ""), album_info.get("langs", []), preferred_lang
+        )
+        if not album_matched and _dominant_script(album) != preferred_script:
             album = _pick_field(
                 music_list, lambda e: e.get("album", {}).get("name", ""), preferred_script
             )
