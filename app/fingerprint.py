@@ -47,6 +47,21 @@ def _dominant_script(text: str) -> str:
     return max(counts, key=counts.get)
 
 
+_SCRIPT_PREFIXES: dict[str, tuple[str, ...]] = {
+    "cjk": ("ja", "zh"),
+    "hangul": ("ko",),
+    "cyrillic": ("ru", "uk", "bg", "sr", "be"),
+}
+
+
+def _preferred_script(lang_code: str) -> str:
+    lower = lang_code.lower()
+    for script, prefixes in _SCRIPT_PREFIXES.items():
+        if any(lower == p or lower.startswith(p + "-") for p in prefixes):
+            return script
+    return "latin"
+
+
 def identify_audio(wav_bytes: bytes) -> dict | None:
     """
     Sends WAV audio bytes to ACRCloud for identification.

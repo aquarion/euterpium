@@ -7,7 +7,7 @@ import hmac
 import pytest
 
 import fingerprint
-from fingerprint import _build_signature, _dominant_script
+from fingerprint import _build_signature, _dominant_script, _preferred_script
 
 # ── Signature generation ──────────────────────────────────────────────────────
 
@@ -228,3 +228,42 @@ def test_dominant_script_unknown_for_punctuation():
 
 def test_dominant_script_empty_string():
     assert _dominant_script("") == "unknown"
+
+
+# ── _preferred_script ─────────────────────────────────────────────────────────
+
+
+def test_preferred_script_en_is_latin():
+    assert _preferred_script("en") == "latin"
+
+
+def test_preferred_script_en_gb_is_latin():
+    assert _preferred_script("en-GB") == "latin"
+
+
+def test_preferred_script_ja_is_cjk():
+    assert _preferred_script("ja") == "cjk"
+
+
+def test_preferred_script_zh_hans_is_cjk():
+    assert _preferred_script("zh-Hans") == "cjk"
+
+
+def test_preferred_script_zh_hans_cn_is_cjk():
+    assert _preferred_script("zh-Hans-CN") == "cjk"
+
+
+def test_preferred_script_ko_is_hangul():
+    assert _preferred_script("ko") == "hangul"
+
+
+def test_preferred_script_ru_is_cyrillic():
+    assert _preferred_script("ru") == "cyrillic"
+
+
+def test_preferred_script_unknown_code_defaults_to_latin():
+    assert _preferred_script("xx-Unknown") == "latin"
+
+
+def test_preferred_script_empty_string_defaults_to_latin():
+    assert _preferred_script("") == "latin"
