@@ -46,14 +46,16 @@ In practice, `langs` on artist/album is less common; the more frequent case is m
 3. Read `HKCU\Control Panel\International\LocaleName`.
 4. Return the registry value, or `"en"` on any failure.
 
-### `fingerprint._pick_lang(primary: str, langs: list[dict], preferred: str) -> str`
+### `fingerprint._pick_lang(primary: str, langs: list[dict], preferred: str) -> tuple[str, bool]`
 
-Selects the best available name using the `langs` array:
+Selects the best available name using the `langs` array and returns `(value, matched)`:
 
-1. Return `primary` immediately if `langs` is empty or `preferred` is empty.
+1. Return `(primary, False)` immediately if `langs` is empty or `preferred` is empty.
 2. Try exact match: find entry where `code == preferred`.
 3. Progressively strip the trailing subtag and retry: `en-GB` → `en`, `zh-Hans-CN` → `zh-Hans` → `zh`.
-4. Return the matched `name`, or `primary` if nothing matched.
+4. Return `(matched name, True)` when a `langs` entry matches, or `(primary, False)` if nothing matched.
+
+The `matched` flag indicates whether the selected value came from a `langs` entry rather than the primary field, so callers can preserve langs-pass priority and skip script scanning when a `langs` match was found (even if the localized name happens to be in a different script from the user's preference).
 
 ### `fingerprint._dominant_script(text: str) -> str`
 
@@ -96,8 +98,8 @@ Call `config.get_acrcloud_language()` and `_preferred_script()` once per invocat
 
 For each of title, artist names, and album name — two-pass selection:
 
-1. **`langs` pass**: apply `_pick_lang` to the `music[0]` field + its `langs` array.
-2. **Script pass**: if the result's dominant script does not match the preferred script, use `_pick_field` to scan all `music[]` entries for one in the preferred script.
+1. **`langs` pass**: apply `_pick_lang` to the `music[0]` field + its `langs` array, capturing the `(value, matched)` tuple.
+2. **Script pass**: only if `matched` is False *and* the result's dominant script does not match the preferred script, use `_pick_field` to scan all `music[]` entries for one in the preferred script.
 
 The `langs` pass takes priority — if it finds a match, the script scan is skipped for that field.
 

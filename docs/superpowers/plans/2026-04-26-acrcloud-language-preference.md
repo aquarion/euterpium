@@ -349,31 +349,31 @@ Append to `app/tests/test_fingerprint.py`:
 
 def test_pick_lang_exact_match():
     langs = [{"code": "zh-Hans", "name": "你好"}]
-    assert _pick_lang("Hello", langs, "zh-Hans") == "你好"
+    assert _pick_lang("Hello", langs, "zh-Hans") == ("你好", True)
 
 
 def test_pick_lang_prefix_match_strips_region():
     langs = [{"code": "en", "name": "Hello"}]
-    assert _pick_lang("Hola", langs, "en-GB") == "Hello"
+    assert _pick_lang("Hola", langs, "en-GB") == ("Hello", True)
 
 
 def test_pick_lang_multi_level_strip():
     langs = [{"code": "zh-Hans", "name": "你好"}]
-    assert _pick_lang("Hello", langs, "zh-Hans-CN") == "你好"
+    assert _pick_lang("Hello", langs, "zh-Hans-CN") == ("你好", True)
 
 
 def test_pick_lang_no_match_returns_primary():
     langs = [{"code": "ja", "name": "こんにちは"}]
-    assert _pick_lang("Hello", langs, "en") == "Hello"
+    assert _pick_lang("Hello", langs, "en") == ("Hello", False)
 
 
 def test_pick_lang_empty_langs_returns_primary():
-    assert _pick_lang("Hello", [], "en") == "Hello"
+    assert _pick_lang("Hello", [], "en") == ("Hello", False)
 
 
 def test_pick_lang_empty_preferred_returns_primary():
     langs = [{"code": "en", "name": "Hello"}]
-    assert _pick_lang("Hola", langs, "") == "Hola"
+    assert _pick_lang("Hola", langs, "") == ("Hola", False)
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -389,19 +389,23 @@ Expected: 6 FAILs with `ImportError: cannot import name '_pick_lang'`
 Insert after `_preferred_script()` in `app/fingerprint.py`:
 
 ```python
-def _pick_lang(primary: str, langs: list[dict], preferred: str) -> str:
+def _pick_lang(primary: str, langs: list[dict], preferred: str) -> tuple[str, bool]:
     if not langs or not preferred:
-        return primary
+        return primary, False
     candidate = preferred
     while candidate:
         for entry in langs:
             if entry.get("code", "").lower() == candidate.lower():
-                return entry["name"]
+                name = entry.get("name")
+                if name:
+                    return name, True
         if "-" not in candidate:
             break
         candidate = candidate.rsplit("-", 1)[0]
-    return primary
+    return primary, False
 ```
+
+The `(value, matched)` tuple lets callers preserve langs-pass priority: when `matched` is True they should skip the script-scan fallback regardless of what script the localized name happens to be in.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -712,22 +716,30 @@ def identify_audio(wav_bytes: bytes) -> dict | None:
         preferred_script = _preferred_script(preferred_lang)
 
         def _artist_str(entry: dict) -> str:
-            return ", ".join(a["name"] for a in entry.get("artists", []))
+            return ", ".join(
+                name for a in entry.get("artists", []) if (name := a.get("name", ""))
+            )
 
-        title = _pick_lang(music.get("title", ""), music.get("langs", []), preferred_lang)
-        if _dominant_script(title) != preferred_script:
+        title, title_matched = _pick_lang(
+            music.get("title", ""), music.get("langs", []), preferred_lang
+        )
+        if not title_matched and _dominant_script(title) != preferred_script:
             title = _pick_field(music_list, lambda e: e.get("title", ""), preferred_script)
 
-        artist = ", ".join(
-            _pick_lang(a["name"], a.get("langs", []), preferred_lang)
+        artist_results = [
+            _pick_lang(a.get("name", ""), a.get("langs", []), preferred_lang)
             for a in music.get("artists", [])
-        )
-        if _dominant_script(artist) != preferred_script:
+        ]
+        artist = ", ".join(value for value, _ in artist_results if value)
+        all_artists_matched = bool(artist_results) and all(matched for _, matched in artist_results)
+        if not all_artists_matched and _dominant_script(artist) != preferred_script:
             artist = _pick_field(music_list, _artist_str, preferred_script)
 
         album_info = music.get("album", {})
-        album = _pick_lang(album_info.get("name", ""), album_info.get("langs", []), preferred_lang)
-        if _dominant_script(album) != preferred_script:
+        album, album_matched = _pick_lang(
+            album_info.get("name", ""), album_info.get("langs", []), preferred_lang
+        )
+        if not album_matched and _dominant_script(album) != preferred_script:
             album = _pick_field(
                 music_list, lambda e: e.get("album", {}).get("name", ""), preferred_script
             )

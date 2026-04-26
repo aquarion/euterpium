@@ -509,3 +509,28 @@ def test_identify_audio_skips_script_scan_when_langs_matches(monkeypatch, config
     result = fingerprint.identify_audio(b"audio")
     # Title from langs match wins, even though it's CJK and preferred is en/latin.
     assert result["title"] == "你好"
+
+
+def test_identify_audio_filters_empty_artist_names(monkeypatch, configured_credentials):
+    response = _make_response(
+        {
+            "status": {"code": 0, "msg": "Success"},
+            "metadata": {
+                "music": [
+                    {
+                        "title": "Song",
+                        "artists": [{}, {"name": "Real Artist"}, {"name": ""}],
+                        "album": {"name": "Album"},
+                        "release_date": "",
+                        "acrid": "abc",
+                        "external_metadata": {},
+                    }
+                ]
+            },
+        }
+    )
+    monkeypatch.setattr(fingerprint.requests, "post", lambda *a, **kw: response)
+    monkeypatch.setattr(fingerprint.config, "get_acrcloud_language", lambda: "en")
+
+    result = fingerprint.identify_audio(b"audio")
+    assert result["artist"] == "Real Artist"

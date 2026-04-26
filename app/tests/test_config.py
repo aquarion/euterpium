@@ -356,3 +356,20 @@ def test_get_acrcloud_language_registry_error_returns_en(tmp_config, monkeypatch
     fake_winreg.OpenKey = _raise
     monkeypatch.setitem(sys.modules, "winreg", fake_winreg)
     assert config.get_acrcloud_language() == "en"
+
+
+def test_get_acrcloud_language_non_string_registry_value_returns_en(tmp_config, monkeypatch):
+    fake_winreg = types.ModuleType("winreg")
+    fake_winreg.HKEY_CURRENT_USER = 0
+
+    class _FakeKey:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+    fake_winreg.OpenKey = lambda *a: _FakeKey()
+    fake_winreg.QueryValueEx = lambda key, name: (None, 1)
+    monkeypatch.setitem(sys.modules, "winreg", fake_winreg)
+    assert config.get_acrcloud_language() == "en"

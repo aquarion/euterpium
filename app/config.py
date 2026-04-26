@@ -168,6 +168,8 @@ def get_acrcloud_language() -> str:
 
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Control Panel\International") as key:
             value, _ = winreg.QueryValueEx(key, "LocaleName")
+            if not isinstance(value, str):
+                return "en"
             stripped = value.strip()
             return stripped if stripped else "en"
     except (ImportError, OSError):
