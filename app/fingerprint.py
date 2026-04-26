@@ -76,6 +76,14 @@ def _pick_lang(primary: str, langs: list[dict], preferred: str) -> str:
     return primary
 
 
+def _pick_field(entries: list[dict], field_fn, preferred_script: str) -> str:
+    for entry in entries:
+        value = field_fn(entry)
+        if value and _dominant_script(value) == preferred_script:
+            return value
+    return field_fn(entries[0])
+
+
 def identify_audio(wav_bytes: bytes) -> dict | None:
     """
     Sends WAV audio bytes to ACRCloud for identification.

@@ -7,7 +7,13 @@ import hmac
 import pytest
 
 import fingerprint
-from fingerprint import _build_signature, _dominant_script, _pick_lang, _preferred_script
+from fingerprint import (
+    _build_signature,
+    _dominant_script,
+    _pick_field,
+    _pick_lang,
+    _preferred_script,
+)
 
 # ── Signature generation ──────────────────────────────────────────────────────
 
@@ -299,3 +305,30 @@ def test_pick_lang_empty_langs_returns_primary():
 def test_pick_lang_empty_preferred_returns_primary():
     langs = [{"code": "en", "name": "Hello"}]
     assert _pick_lang("Hola", langs, "") == "Hola"
+
+
+# ── _pick_field ───────────────────────────────────────────────────────────────
+
+
+def test_pick_field_returns_entry_in_preferred_script():
+    entries = [
+        {"title": "祖堅正慶"},
+        {"title": "Masayoshi Soken"},
+    ]
+    assert _pick_field(entries, lambda e: e["title"], "latin") == "Masayoshi Soken"
+
+
+def test_pick_field_falls_back_to_first_when_no_match():
+    entries = [
+        {"title": "祖堅正慶"},
+        {"title": "最終幻想"},
+    ]
+    assert _pick_field(entries, lambda e: e["title"], "latin") == "祖堅正慶"
+
+
+def test_pick_field_returns_first_when_it_already_matches():
+    entries = [
+        {"title": "Masayoshi Soken"},
+        {"title": "祖堅正慶"},
+    ]
+    assert _pick_field(entries, lambda e: e["title"], "latin") == "Masayoshi Soken"
