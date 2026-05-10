@@ -227,3 +227,4 @@ euterpium.ini.local
 playnite-plugin/bin/
 playnite-plugin/obj/
 playnite-plugin-test/
+.claude/settings.json

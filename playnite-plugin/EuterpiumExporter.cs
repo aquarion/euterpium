@@ -261,7 +261,7 @@ namespace EuterpiumExporter
                         .Where(char.IsLetterOrDigit)
                         .ToArray());
 
-                    return candidates.FirstOrDefault(f =>
+                    var slugMatch = candidates.FirstOrDefault(f =>
                     {
                         var nameSlug = new string(
                             System.IO.Path.GetFileNameWithoutExtension(f)
@@ -270,6 +270,13 @@ namespace EuterpiumExporter
                                 .ToArray());
                         return nameSlug.Contains(slug) || slug.Contains(nameSlug);
                     });
+
+                    if (!string.IsNullOrWhiteSpace(slugMatch))
+                        return slugMatch;
+
+                    // Some games use a generic "*Game.exe" binary name (e.g. FactoryGame.exe).
+                    return candidates.FirstOrDefault(f =>
+                        f.EndsWith("Game.exe", StringComparison.OrdinalIgnoreCase));
                 }
             }
             catch (Exception ex)
