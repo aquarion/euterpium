@@ -1,6 +1,8 @@
 # tests/test_config.py — config read/write, profiles, migration, validation
 
 import logging
+import sys
+import types
 
 import pytest
 
@@ -317,3 +319,57 @@ def test_spectral_config_round_trip(tmp_config):
     assert config.get_spectral_flatness_threshold() == pytest.approx(0.5)
     assert config.get_fingerprint_bands() == 16
     assert config.get_fingerprint_change_threshold() == pytest.approx(0.4)
+
+
+# ── ACRCloud language ──────────────────────────────────────────────────────────
+
+
+def test_get_acrcloud_language_explicit_ini(tmp_config):
+    config.save({"acrcloud": {"language": "ja"}})
+    assert config.get_acrcloud_language() == "ja"
+
+
+def test_get_acrcloud_language_from_registry(tmp_config, monkeypatch):
+    fake_winreg = types.ModuleType("winreg")
+    fake_winreg.HKEY_CURRENT_USER = 0
+
+    class _FakeKey:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+    fake_winreg.OpenKey = lambda *a: _FakeKey()
+    fake_winreg.QueryValueEx = lambda key, name: ("en-GB", 1)
+    monkeypatch.setitem(sys.modules, "winreg", fake_winreg)
+    assert config.get_acrcloud_language() == "en-GB"
+
+
+def test_get_acrcloud_language_registry_error_returns_en(tmp_config, monkeypatch):
+    fake_winreg = types.ModuleType("winreg")
+    fake_winreg.HKEY_CURRENT_USER = 0
+
+    def _raise(*a):
+        raise OSError("no registry")
+
+    fake_winreg.OpenKey = _raise
+    monkeypatch.setitem(sys.modules, "winreg", fake_winreg)
+    assert config.get_acrcloud_language() == "en"
+
+
+def test_get_acrcloud_language_non_string_registry_value_returns_en(tmp_config, monkeypatch):
+    fake_winreg = types.ModuleType("winreg")
+    fake_winreg.HKEY_CURRENT_USER = 0
+
+    class _FakeKey:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+    fake_winreg.OpenKey = lambda *a: _FakeKey()
+    fake_winreg.QueryValueEx = lambda key, name: (None, 1)
+    monkeypatch.setitem(sys.modules, "winreg", fake_winreg)
+    assert config.get_acrcloud_language() == "en"
