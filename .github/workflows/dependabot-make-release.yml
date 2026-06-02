@@ -78,7 +78,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: gh pr merge dependabot-updates --merge --yes
+        run: gh pr merge dependabot-updates --merge
 
   create-release-tag:
     needs: [check-for-updates, merge-dependabot]
