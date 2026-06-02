@@ -71,23 +71,14 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
 
     steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: main
-          fetch-depth: 0
-
-      - name: Configure git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Merge dependabot-updates into main
-        run: |
-          git fetch origin dependabot-updates
-          git merge origin/dependabot-updates --no-ff -m "Merge dependabot updates"
-          git push origin main
+      - name: Merge dependabot-updates PR into main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh pr merge dependabot-updates --merge --yes
 
   create-release-tag:
     needs: [check-for-updates, merge-dependabot]
