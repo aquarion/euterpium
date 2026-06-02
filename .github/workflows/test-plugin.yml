@@ -2,7 +2,7 @@ name: "[Tests] Playnite Plugin Build"
 
 on:
   push:
-    branches: [main]
+    branches: [main, dependabot-updates]
   pull_request:
 
 permissions: read-all
