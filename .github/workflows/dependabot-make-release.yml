@@ -80,6 +80,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           gh pr ready dependabot-updates
+          gh pr checks dependabot-updates --watch --fail-fast
           gh pr merge dependabot-updates --merge
 
   create-release-tag:
