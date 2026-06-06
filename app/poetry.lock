@@ -739,19 +739,19 @@ files = [
 
 [[package]]
 name = "checkov"
-version = "3.2.530"
+version = "3.2.532"
 description = "Infrastructure as code static analysis"
 optional = false
 python-versions = ">=3.9"
 groups = ["dev"]
 files = [
-    {file = "checkov-3.2.530-py3-none-any.whl", hash = "sha256:f70558c6d971a5df433ca71bb50a20b7d24a903040e18b3fd50ebbdabf22b25a"},
-    {file = "checkov-3.2.530.tar.gz", hash = "sha256:b925a3601cbb13a9eac04b171dbdf411b7b05c45b3d3e3297b27d32767d1fd27"},
+    {file = "checkov-3.2.532-py3-none-any.whl", hash = "sha256:2cb06fccb6db07f61f14aaec64fef47919de056dfeb6bbd0bd509de8231d6cca"},
+    {file = "checkov-3.2.532.tar.gz", hash = "sha256:e92e245447a00151950bc0050408ef1a4ea67e300bfb1f26693c77086e31852b"},
 ]
 
 [package.dependencies]
 aiodns = ">=3.0.0,<4.0.0"
-aiohttp = ">=3.8.0,<4.0.0"
+aiohttp = ">=3.8.0,<3.14.0"
 aiomultiprocess = ">=0.9.0,<0.10.0"
 argcomplete = ">=3.0.0,<4.0.0"
 asteval = "1.0.6"
@@ -769,6 +769,7 @@ cyclonedx-python-lib = ">=6.0.0,<8.0.0"
 docker = ">=6.0.1,<8.0.0"
 dockerfile-parse = ">=2.0.0,<3.0.0"
 dpath = "2.1.3"
+ecdsa = ">=0.19.0,<1.0.0"
 gitpython = ">=3.1.30,<4.0.0"
 importlib-metadata = ">=6.0.0,<8.0.0"
 jmespath = ">=1.0.0,<2.0.0"
@@ -1115,6 +1116,25 @@ files = [
     {file = "dpath-2.1.3-py3-none-any.whl", hash = "sha256:d9560e03ccd83b3c6f29988b0162ce9b34fd28b9d8dbda46663b20c68d9cdae3"},
     {file = "dpath-2.1.3.tar.gz", hash = "sha256:d1a7a0e6427d0a4156c792c82caf1f0109603f68ace792e36ca4596fd2cb8d9d"},
 ]
+
+[[package]]
+name = "ecdsa"
+version = "0.19.2"
+description = "ECDSA cryptographic signature library (pure python)"
+optional = false
+python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.6"
+groups = ["dev"]
+files = [
+    {file = "ecdsa-0.19.2-py2.py3-none-any.whl", hash = "sha256:840f5dc5e375c68f36c1a7a5b9caad28f95daa65185c9253c0c08dd952bb7399"},
+    {file = "ecdsa-0.19.2.tar.gz", hash = "sha256:62635b0ac1ca2e027f82122b5b81cb706edc38cd91c63dda28e4f3455a2bf930"},
+]
+
+[package.dependencies]
+six = ">=1.9.0"
+
+[package.extras]
+gmpy = ["gmpy"]
+gmpy2 = ["gmpy2"]
 
 [[package]]
 name = "exceptiongroup"
@@ -2195,14 +2215,14 @@ xmp = ["defusedxml"]
 
 [[package]]
 name = "platformdirs"
-version = "4.9.6"
+version = "4.10.0"
 description = "A small Python package for determining appropriate platform-specific dirs, e.g. a `user data dir`."
 optional = false
 python-versions = ">=3.10"
 groups = ["main", "dev"]
 files = [
-    {file = "platformdirs-4.9.6-py3-none-any.whl", hash = "sha256:e61adb1d5e5cb3441b4b7710bea7e4c12250ca49439228cc1021c00dcfac0917"},
-    {file = "platformdirs-4.9.6.tar.gz", hash = "sha256:3bfa75b0ad0db84096ae777218481852c0ebc6c727b3168c1b9e0118e458cf0a"},
+    {file = "platformdirs-4.10.0-py3-none-any.whl", hash = "sha256:fb516cdb12eb0d857d0cd85a7c57cea4d060bee4578d6cf5a14dfdf8cbf8784a"},
+    {file = "platformdirs-4.10.0.tar.gz", hash = "sha256:31e761a6a0ca04faf7353ea759bdba55652be214725111e5aac52dfa29d4bef7"},
 ]
 
 [[package]]
