@@ -103,3 +103,56 @@ def test_returns_false_on_http_error():
     with patch("requests.post", return_value=mock):
         result = api_client.post_now_playing({"source": "smtc", "title": "T", "artist": "A"})
     assert result is False
+
+
+# ── get_streaming_status ───────────────────────────────────────────────────────
+
+
+def _status_response(is_live):
+    mock = MagicMock()
+    mock.raise_for_status = MagicMock()
+    mock.json.return_value = {"is_live": is_live}
+    return mock
+
+
+def test_streaming_status_returns_none_when_not_configured(monkeypatch):
+    monkeypatch.setattr(config, "api_is_configured", lambda: False)
+    with patch("requests.get") as mock_get:
+        result = api_client.get_streaming_status()
+    assert result is None
+    mock_get.assert_not_called()
+
+
+def test_streaming_status_returns_true_when_live():
+    with patch("requests.get", return_value=_status_response(True)) as mock_get:
+        result = api_client.get_streaming_status()
+    assert result is True
+    assert mock_get.call_args.args[0] == "http://example.com/api/streaming-status"
+
+
+def test_streaming_status_returns_false_when_not_live():
+    with patch("requests.get", return_value=_status_response(False)):
+        result = api_client.get_streaming_status()
+    assert result is False
+
+
+def test_streaming_status_includes_auth_header_when_key_set(monkeypatch):
+    monkeypatch.setattr(config, "get_api_key", lambda: "my-secret-key")
+    with patch("requests.get", return_value=_status_response(True)) as mock_get:
+        api_client.get_streaming_status()
+    headers = mock_get.call_args.kwargs["headers"]
+    assert headers["Authorization"] == "Bearer my-secret-key"
+
+
+def test_streaming_status_returns_none_on_connection_error():
+    with patch("requests.get", side_effect=requests.RequestException("timeout")):
+        result = api_client.get_streaming_status()
+    assert result is None
+
+
+def test_streaming_status_returns_none_on_http_error():
+    mock = MagicMock()
+    mock.raise_for_status.side_effect = requests.HTTPError("500")
+    with patch("requests.get", return_value=mock):
+        result = api_client.get_streaming_status()
+    assert result is None

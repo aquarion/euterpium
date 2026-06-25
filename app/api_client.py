@@ -53,3 +53,32 @@ def post_now_playing(track: dict, game: dict | None = None) -> bool:
     except requests.RequestException as e:
         logger.error(f"API post failed: {e}")
         return False
+
+
+def get_streaming_status() -> bool | None:
+    """
+    Checks whether the API currently considers a broadcast live, via
+    GET {api_url}/streaming-status.
+
+    Returns True/False when the API answers, or None if the status couldn't
+    be determined (not configured, or the request failed) — callers should
+    treat None as "unknown" rather than "not streaming".
+    """
+    if not config.api_is_configured():
+        return None
+
+    api_url = config.get_api_url()
+    api_key = config.get_api_key()
+    status_url = api_url.rstrip("/") + "/streaming-status"
+
+    headers = {}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    try:
+        response = requests.get(status_url, headers=headers, timeout=10)
+        response.raise_for_status()
+        return bool(response.json().get("is_live"))
+    except requests.RequestException as e:
+        logger.error(f"Streaming status check failed: {e}")
+        return None
