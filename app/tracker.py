@@ -6,7 +6,7 @@ import threading
 import time
 
 import config
-from api_client import post_now_playing
+from api_client import get_streaming_status, post_now_playing
 from audio_capture import AudioChangeDetector, audio_to_wav_bytes, capture_audio
 from config import POLL_INTERVAL
 from fingerprint import identify_audio
@@ -178,6 +178,10 @@ class Tracker:
     def _post_now_playing_with_status(self, track: dict, game: dict | None = None):
         if not config.api_is_configured():
             self._emit("delivery", "Webhook skipped (not configured)", "warn")
+            return
+
+        if get_streaming_status() is False:
+            self._emit("delivery", "Webhook skipped (not streaming)", "warn")
             return
 
         posted = post_now_playing(track, game=game)

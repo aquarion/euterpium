@@ -490,8 +490,9 @@ def test_track_key_uses_game_name_as_fallback(tracker):
 
 
 @patch("tracker.config.api_is_configured", return_value=True)
+@patch("tracker.get_streaming_status", return_value=True)
 @patch("tracker.post_now_playing", return_value=True)
-def test_post_now_playing_webhook_sent(mock_post, mock_api, tracker):
+def test_post_now_playing_webhook_sent(mock_post, mock_status, mock_api, tracker):
     tracker._post_now_playing_with_status({"title": "Song"}, game=None)
     events = []
     while not tracker.event_queue.empty():
@@ -500,8 +501,9 @@ def test_post_now_playing_webhook_sent(mock_post, mock_api, tracker):
 
 
 @patch("tracker.config.api_is_configured", return_value=True)
+@patch("tracker.get_streaming_status", return_value=True)
 @patch("tracker.post_now_playing", return_value=False)
-def test_post_now_playing_webhook_failed(mock_post, mock_api, tracker):
+def test_post_now_playing_webhook_failed(mock_post, mock_status, mock_api, tracker):
     tracker._post_now_playing_with_status({"title": "Song"}, game=None)
     events = []
     while not tracker.event_queue.empty():
@@ -510,8 +512,9 @@ def test_post_now_playing_webhook_failed(mock_post, mock_api, tracker):
 
 
 @patch("tracker.config.api_is_configured")
+@patch("tracker.get_streaming_status", return_value=True)
 @patch("tracker.post_now_playing", return_value=False)
-def test_post_now_playing_rechecks_config_on_failure(mock_post, mock_api, tracker):
+def test_post_now_playing_rechecks_config_on_failure(mock_post, mock_status, mock_api, tracker):
     """When post fails and config has since become unconfigured, emit not-configured warning."""
     mock_api.side_effect = [True, False]
     tracker._post_now_playing_with_status({"title": "Song"}, game=None)
@@ -519,6 +522,35 @@ def test_post_now_playing_rechecks_config_on_failure(mock_post, mock_api, tracke
     while not tracker.event_queue.empty():
         events.append(tracker.event_queue.get_nowait())
     assert any(e[0] == "delivery" and "not configured" in e[1] for e in events)
+
+
+@patch("tracker.config.api_is_configured", return_value=True)
+@patch("tracker.get_streaming_status", return_value=False)
+@patch("tracker.post_now_playing")
+def test_post_now_playing_skipped_when_not_streaming(mock_post, mock_status, mock_api, tracker):
+    tracker._post_now_playing_with_status({"title": "Song"}, game=None)
+    events = []
+    while not tracker.event_queue.empty():
+        events.append(tracker.event_queue.get_nowait())
+    assert any(
+        e[0] == "delivery" and "not streaming" in e[1] and e[2] == "warn" for e in events
+    )
+    mock_post.assert_not_called()
+
+
+@patch("tracker.config.api_is_configured", return_value=True)
+@patch("tracker.get_streaming_status", return_value=None)
+@patch("tracker.post_now_playing", return_value=True)
+def test_post_now_playing_proceeds_when_streaming_status_unknown(
+    mock_post, mock_status, mock_api, tracker
+):
+    """When the streaming-status check fails/can't be determined, post anyway (fail-open)."""
+    tracker._post_now_playing_with_status({"title": "Song"}, game=None)
+    events = []
+    while not tracker.event_queue.empty():
+        events.append(tracker.event_queue.get_nowait())
+    mock_post.assert_called_once()
+    assert any(e[0] == "delivery" and "Webhook sent" in e[1] for e in events)
 
 
 def test_emit_excluded_smtc_artist_only(tracker):

@@ -146,6 +146,12 @@ break validation. The explicit lower bound `jsonschema>=4.18.0` in
 
 - `post_now_playing()` returns `False` immediately (skips the HTTP request) if
   `config.api_is_configured()` is False.
+- `get_streaming_status()` calls `GET {api_url}/streaming-status` and returns
+  `True`/`False`, or `None` if the check couldn't be made (not configured, or
+  the request failed). `tracker._post_now_playing_with_status()` skips the
+  webhook when this returns `False`, but proceeds (fail-open) when it returns
+  `None` — an unreachable status endpoint shouldn't silently drop now-playing
+  data.
 - Reads config live on every call, so credential changes take effect without a
   restart.
 
