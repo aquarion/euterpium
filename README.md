@@ -41,7 +41,7 @@ Config is stored at `%LOCALAPPDATA%\euterpium\euterpium.ini`.
 |------|---------|
 | `app/main.py` | Entry point — wires tracker, tray, window together |
 | `app/tracker.py` | Background detection loop |
-| `app/smtc.py` | Windows Media Session (SMTC) detection via winsdk |
+| `app/smtc.py` | Windows Media Session (SMTC) detection via pywinrt |
 | `app/fingerprint.py` | ACRCloud audio fingerprinting |
 | `app/audio_capture.py` | WASAPI loopback capture + audio change detection |
 | `app/game_detector.py` | Detects known game processes via psutil |
