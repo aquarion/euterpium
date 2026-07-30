@@ -26,6 +26,7 @@ a = Analysis(
         # pywinrt WinRT machinery
         'winrt.windows.media.control',
         'winrt.windows.media',
+        'winrt.windows.foundation',
         # win11toast pulls in these at runtime
         'win11toast',
         'winrt',

@@ -55,6 +55,18 @@ def _make_manager(session):
     return mock_manager
 
 
+# ── real pywinrt import ───────────────────────────────────────────────────────
+
+
+def test_pywinrt_types_are_real_on_windows():
+    """Unmocked check that the module-level try/except actually bound real
+    winrt types, rather than relying on mocked tests below to incidentally
+    catch a broken import."""
+    assert smtc_module.PYWINRT_AVAILABLE is True
+    assert smtc_module.MediaManager.__module__.startswith("winrt")
+    assert smtc_module.MediaPlaybackStatus.__module__.startswith("winrt")
+
+
 # ── pywinrt unavailable ───────────────────────────────────────────────────────
 
 

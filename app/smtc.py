@@ -22,7 +22,8 @@ except ImportError as e:
     PYWINRT_AVAILABLE = False
     logger.warning(
         f"pywinrt not available ({e}) — SMTC detection disabled. "
-        "Install with: pip install winrt-Windows.Media.Control winrt-Windows.Media"
+        "Install with: pip install winrt-Windows.Media.Control winrt-Windows.Media "
+        "winrt-Windows.Foundation"
     )
 
 
