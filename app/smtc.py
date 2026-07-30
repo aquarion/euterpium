@@ -65,7 +65,7 @@ async def get_smtc_track(ignored_apps: list[str] | None = None) -> dict | None:
                 if (
                     pattern in app_id_lower
                     or pattern in app_name_lower
-                    or pattern_stem in app_name_lower
+                    or (pattern_stem and pattern_stem in app_name_lower)
                 ):
                     excluded_pattern = pattern
                     logger.debug(
