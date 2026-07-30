@@ -30,6 +30,9 @@ def notify_track(track: dict, game: dict | None = None):
     if not WIN11TOAST_AVAILABLE:
         return
 
+    if track.get("excluded"):
+        return
+
     title = track.get("title", "")
     artist = track.get("artist", "")
     source = track.get("source", "")
