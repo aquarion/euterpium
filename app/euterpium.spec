@@ -23,9 +23,10 @@ a = Analysis(
         'tkinter.ttk',
         'tkinter.messagebox',
         'tkinter.filedialog',
-        # winsdk WinRT machinery
-        'winsdk.windows.media.control',
-        'winsdk.windows.media',
+        # pywinrt WinRT machinery
+        'winrt.windows.media.control',
+        'winrt.windows.media',
+        'winrt.windows.foundation',
         # win11toast pulls in these at runtime
         'win11toast',
         'winrt',

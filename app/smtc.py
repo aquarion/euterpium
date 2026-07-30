@@ -11,31 +11,33 @@ from app_resolver import resolve_app_name
 logger = logging.getLogger(__name__)
 
 try:
-    from winsdk.windows.media import MediaPlaybackStatus
-    from winsdk.windows.media.control import (
+    from winrt.windows.media import MediaPlaybackStatus
+    from winrt.windows.media.control import (
         GlobalSystemMediaTransportControlsSessionManager as MediaManager,
     )
 
-    WINSDK_AVAILABLE = True
-    logger.info("winsdk loaded — SMTC detection enabled")
+    PYWINRT_AVAILABLE = True
+    logger.info("pywinrt loaded — SMTC detection enabled")
 except ImportError as e:
-    WINSDK_AVAILABLE = False
+    PYWINRT_AVAILABLE = False
     logger.warning(
-        f"winsdk not available ({e}) — SMTC detection disabled. Install with: pip install winsdk"
+        f"pywinrt not available ({e}) — SMTC detection disabled. "
+        "Install with: pip install winrt-Windows.Media.Control winrt-Windows.Media "
+        "winrt-Windows.Foundation"
     )
 
 
 async def get_smtc_track(ignored_apps: list[str] | None = None) -> dict | None:
     """
     Returns metadata for the currently playing track via Windows Media Session,
-    or None if nothing is playing / winsdk is unavailable.
+    or None if nothing is playing / pywinrt is unavailable.
 
     ignored_apps: list of lowercase substrings — any session whose
     source_app_user_model_id contains one of these is returned with
     ``excluded=True`` metadata so callers can emit debug/delivery state
     without treating it as a playable now-playing track.
     """
-    if not WINSDK_AVAILABLE:
+    if not PYWINRT_AVAILABLE:
         return None
 
     try:
@@ -125,7 +127,7 @@ def get_smtc_track_sync(ignored_apps: list[str] | None = None) -> dict | None:
     WindowsSelectorEventLoopPolicy is deprecated from Python 3.16 onwards,
     so we create the loop directly instead.
     """
-    if not WINSDK_AVAILABLE:
+    if not PYWINRT_AVAILABLE:
         return None
 
     try:

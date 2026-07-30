@@ -26,7 +26,7 @@ app/                Python application source + tests
   rest_api.py       Flask-RESTX server on http://127.0.0.1:43174/api/
   api_client.py     Posts now-playing payload to external webhook
   config.py         Reads/writes euterpium.ini from platform config dir
-  smtc.py           Windows SMTC detection (winsdk, Windows-only)
+  smtc.py           Windows SMTC detection (pywinrt, Windows-only)
   version.py        Version constants
   ui/               TrayIcon, MainWindow, notifications
   tests/            pytest test suite (one file per module)
@@ -56,7 +56,8 @@ Tests use `pytest` ≥ 8.0 and `unittest.mock` (stdlib). There is no `pytest-moc
 dependency; all mocking uses `unittest.mock.patch` / `MagicMock` directly.
 `conftest.py` in `tests/` handles shared fixtures.
 
-Non-Windows: `winsdk` / `win11toast` are platform-conditional deps. SMTC tests are
+Non-Windows: `winrt-Windows.Media` / `winrt-Windows.Media.Control` / `win11toast` are
+platform-conditional deps. SMTC tests are
 skipped on non-Windows via `pytestmark = pytest.mark.skipif(...)`. Windows-only
 modules that need to be tested cross-platform (e.g. `startup.py`) use the lazy
 import pattern — `import winreg` inside the function body — so tests can inject a
@@ -159,10 +160,11 @@ break validation. The explicit lower bound `jsonschema>=4.18.0` in
 
 ## SMTC (`smtc.py`)
 
-- Tries `from winsdk.windows.media import ...` at module level.
-- On failure (non-Windows, winsdk not installed) sets `WINSDK_AVAILABLE = False`
+- Tries `from winrt.windows.media import ...` at module level (pywinrt, the
+  successor to the deprecated `winsdk` package).
+- On failure (non-Windows, pywinrt not installed) sets `PYWINRT_AVAILABLE = False`
   and does **not** define `MediaManager` / `MediaPlaybackStatus` names. Code
-  that references those names must be gated on `WINSDK_AVAILABLE`.
+  that references those names must be gated on `PYWINRT_AVAILABLE`.
 
 ---
 

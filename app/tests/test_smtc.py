@@ -3,7 +3,7 @@
 # app_resolver tests were moved here historically; they live in test_app_resolver.py.
 # This file covers smtc.get_smtc_track (async) and get_smtc_track_sync.
 #
-# winsdk is Windows-only — these tests are skipped on other platforms.
+# pywinrt is Windows-only — these tests are skipped on other platforms.
 
 import asyncio
 import sys
@@ -14,7 +14,7 @@ import pytest
 import smtc as smtc_module
 from smtc import get_smtc_track, get_smtc_track_sync
 
-pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="winsdk is Windows-only")
+pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="pywinrt is Windows-only")
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -55,17 +55,29 @@ def _make_manager(session):
     return mock_manager
 
 
-# ── WINSDK unavailable ────────────────────────────────────────────────────────
+# ── real pywinrt import ───────────────────────────────────────────────────────
 
 
-def test_get_smtc_track_returns_none_when_winsdk_unavailable():
-    with patch.object(smtc_module, "WINSDK_AVAILABLE", False):
+def test_pywinrt_types_are_real_on_windows():
+    """Unmocked check that the module-level try/except actually bound real
+    winrt types, rather than relying on mocked tests below to incidentally
+    catch a broken import."""
+    assert smtc_module.PYWINRT_AVAILABLE is True
+    assert smtc_module.MediaManager.__module__.startswith("winrt")
+    assert smtc_module.MediaPlaybackStatus.__module__.startswith("winrt")
+
+
+# ── pywinrt unavailable ───────────────────────────────────────────────────────
+
+
+def test_get_smtc_track_returns_none_when_pywinrt_unavailable():
+    with patch.object(smtc_module, "PYWINRT_AVAILABLE", False):
         result = asyncio.run(get_smtc_track())
     assert result is None
 
 
-def test_get_smtc_track_sync_returns_none_when_winsdk_unavailable():
-    with patch.object(smtc_module, "WINSDK_AVAILABLE", False):
+def test_get_smtc_track_sync_returns_none_when_pywinrt_unavailable():
+    with patch.object(smtc_module, "PYWINRT_AVAILABLE", False):
         result = get_smtc_track_sync()
     assert result is None
 
@@ -80,7 +92,7 @@ def test_get_smtc_track_returns_none_when_no_session():
     mock_manager.request_async = AsyncMock(return_value=mock_sessions)
 
     with (
-        patch.object(smtc_module, "WINSDK_AVAILABLE", True),
+        patch.object(smtc_module, "PYWINRT_AVAILABLE", True),
         patch.object(smtc_module, "MediaManager", mock_manager),
     ):
         result = asyncio.run(get_smtc_track())
@@ -100,7 +112,7 @@ def test_get_smtc_track_returns_none_when_stopped():
     mock_status.CLOSED = object()  # different object — won't match
 
     with (
-        patch.object(smtc_module, "WINSDK_AVAILABLE", True),
+        patch.object(smtc_module, "PYWINRT_AVAILABLE", True),
         patch.object(smtc_module, "MediaManager", manager),
         patch.object(smtc_module, "MediaPlaybackStatus", mock_status),
     ):
@@ -118,7 +130,7 @@ def test_get_smtc_track_returns_none_when_closed():
     mock_status.CLOSED = sentinel
 
     with (
-        patch.object(smtc_module, "WINSDK_AVAILABLE", True),
+        patch.object(smtc_module, "PYWINRT_AVAILABLE", True),
         patch.object(smtc_module, "MediaManager", manager),
         patch.object(smtc_module, "MediaPlaybackStatus", mock_status),
     ):
@@ -138,7 +150,7 @@ def test_get_smtc_track_returns_track_when_paused():
     mock_status.PAUSED = paused
 
     with (
-        patch.object(smtc_module, "WINSDK_AVAILABLE", True),
+        patch.object(smtc_module, "PYWINRT_AVAILABLE", True),
         patch.object(smtc_module, "MediaManager", manager),
         patch.object(smtc_module, "MediaPlaybackStatus", mock_status),
         patch("smtc.resolve_app_name", return_value="spotify.exe"),
@@ -159,7 +171,7 @@ def test_get_smtc_track_returns_expected_fields():
     mock_status.CLOSED = object()
 
     with (
-        patch.object(smtc_module, "WINSDK_AVAILABLE", True),
+        patch.object(smtc_module, "PYWINRT_AVAILABLE", True),
         patch.object(smtc_module, "MediaManager", manager),
         patch.object(smtc_module, "MediaPlaybackStatus", mock_status),
         patch("smtc.resolve_app_name", return_value="spotify.exe"),
@@ -184,7 +196,7 @@ def test_get_smtc_track_returns_none_when_no_title_or_artist():
     mock_status.CLOSED = object()
 
     with (
-        patch.object(smtc_module, "WINSDK_AVAILABLE", True),
+        patch.object(smtc_module, "PYWINRT_AVAILABLE", True),
         patch.object(smtc_module, "MediaManager", manager),
         patch.object(smtc_module, "MediaPlaybackStatus", mock_status),
         patch("smtc.resolve_app_name", return_value="app.exe"),
@@ -205,7 +217,7 @@ def test_get_smtc_track_splits_apple_music_artist_album():
     mock_status.CLOSED = object()
 
     with (
-        patch.object(smtc_module, "WINSDK_AVAILABLE", True),
+        patch.object(smtc_module, "PYWINRT_AVAILABLE", True),
         patch.object(smtc_module, "MediaManager", manager),
         patch.object(smtc_module, "MediaPlaybackStatus", mock_status),
         patch("smtc.resolve_app_name", return_value="applemusic.exe"),
@@ -225,7 +237,7 @@ def test_get_smtc_track_does_not_split_when_album_present():
     mock_status.CLOSED = object()
 
     with (
-        patch.object(smtc_module, "WINSDK_AVAILABLE", True),
+        patch.object(smtc_module, "PYWINRT_AVAILABLE", True),
         patch.object(smtc_module, "MediaManager", manager),
         patch.object(smtc_module, "MediaPlaybackStatus", mock_status),
         patch("smtc.resolve_app_name", return_value="applemusic.exe"),
@@ -247,7 +259,7 @@ def test_get_smtc_track_marks_excluded_when_app_id_matches():
     mock_status.CLOSED = object()
 
     with (
-        patch.object(smtc_module, "WINSDK_AVAILABLE", True),
+        patch.object(smtc_module, "PYWINRT_AVAILABLE", True),
         patch.object(smtc_module, "MediaManager", manager),
         patch.object(smtc_module, "MediaPlaybackStatus", mock_status),
         patch("smtc.resolve_app_name", return_value="firefox.exe"),
@@ -268,7 +280,7 @@ def test_get_smtc_track_marks_excluded_when_app_name_matches():
     mock_status.CLOSED = object()
 
     with (
-        patch.object(smtc_module, "WINSDK_AVAILABLE", True),
+        patch.object(smtc_module, "PYWINRT_AVAILABLE", True),
         patch.object(smtc_module, "MediaManager", manager),
         patch.object(smtc_module, "MediaPlaybackStatus", mock_status),
         patch("smtc.resolve_app_name", return_value="firefox.exe"),
@@ -286,7 +298,7 @@ def test_get_smtc_track_not_excluded_when_no_match():
     mock_status.CLOSED = object()
 
     with (
-        patch.object(smtc_module, "WINSDK_AVAILABLE", True),
+        patch.object(smtc_module, "PYWINRT_AVAILABLE", True),
         patch.object(smtc_module, "MediaManager", manager),
         patch.object(smtc_module, "MediaPlaybackStatus", mock_status),
         patch("smtc.resolve_app_name", return_value="spotify.exe"),
@@ -304,7 +316,7 @@ def test_get_smtc_track_ignored_apps_none_does_not_exclude():
     mock_status.CLOSED = object()
 
     with (
-        patch.object(smtc_module, "WINSDK_AVAILABLE", True),
+        patch.object(smtc_module, "PYWINRT_AVAILABLE", True),
         patch.object(smtc_module, "MediaManager", manager),
         patch.object(smtc_module, "MediaPlaybackStatus", mock_status),
         patch("smtc.resolve_app_name", return_value="spotify.exe"),
@@ -319,10 +331,10 @@ def test_get_smtc_track_ignored_apps_none_does_not_exclude():
 
 def test_get_smtc_track_returns_none_on_exception():
     mock_manager = MagicMock()
-    mock_manager.request_async = AsyncMock(side_effect=RuntimeError("winsdk exploded"))
+    mock_manager.request_async = AsyncMock(side_effect=RuntimeError("pywinrt exploded"))
 
     with (
-        patch.object(smtc_module, "WINSDK_AVAILABLE", True),
+        patch.object(smtc_module, "PYWINRT_AVAILABLE", True),
         patch.object(smtc_module, "MediaManager", mock_manager),
     ):
         result = asyncio.run(get_smtc_track())
@@ -340,7 +352,7 @@ def test_get_smtc_track_sync_returns_track_on_win32():
     mock_status.CLOSED = object()
 
     with (
-        patch.object(smtc_module, "WINSDK_AVAILABLE", True),
+        patch.object(smtc_module, "PYWINRT_AVAILABLE", True),
         patch.object(smtc_module, "MediaManager", manager),
         patch.object(smtc_module, "MediaPlaybackStatus", mock_status),
         patch("smtc.resolve_app_name", return_value="spotify.exe"),
@@ -360,7 +372,7 @@ def test_get_smtc_track_sync_uses_generic_loop_on_non_win32():
     mock_status.CLOSED = object()
 
     with (
-        patch.object(smtc_module, "WINSDK_AVAILABLE", True),
+        patch.object(smtc_module, "PYWINRT_AVAILABLE", True),
         patch.object(smtc_module, "MediaManager", manager),
         patch.object(smtc_module, "MediaPlaybackStatus", mock_status),
         patch("smtc.resolve_app_name", return_value="spotify.exe"),
@@ -376,7 +388,7 @@ def test_get_smtc_track_sync_returns_none_on_exception():
     mock_manager.request_async = AsyncMock(side_effect=RuntimeError("boom"))
 
     with (
-        patch.object(smtc_module, "WINSDK_AVAILABLE", True),
+        patch.object(smtc_module, "PYWINRT_AVAILABLE", True),
         patch.object(smtc_module, "MediaManager", mock_manager),
         patch("smtc.sys.platform", "win32"),
     ):
