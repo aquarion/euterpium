@@ -56,7 +56,17 @@ async def get_smtc_track(ignored_apps: list[str] | None = None) -> dict | None:
             app_id_lower = app_id.lower()
             app_name_lower = app_name.lower()
             for pattern in ignored_apps:
-                if pattern and (pattern in app_id_lower or pattern in app_name_lower):
+                if not pattern:
+                    continue
+                # Friendly names resolved from legacy AUMIDs (e.g. Firefox's hex
+                # AUMID resolves to "Firefox" via the registry) don't carry a
+                # ".exe" suffix, so also compare against the pattern's exe-stem.
+                pattern_stem = pattern[:-4] if pattern.endswith(".exe") else pattern
+                if (
+                    pattern in app_id_lower
+                    or pattern in app_name_lower
+                    or pattern_stem in app_name_lower
+                ):
                     excluded_pattern = pattern
                     logger.debug(
                         f"SMTC: marking session from '{app_id_lower}' as excluded (matches '{pattern}')"
