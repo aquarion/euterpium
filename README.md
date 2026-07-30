@@ -14,7 +14,7 @@ It's loosely tied to [Stream Delta](https://github.com/aquarion/stream-delta), m
 ## Requirements
 
 - Windows 10/11
-- Python 3.10+ (managed via Poetry)
+- Python 3.10–3.12 (managed via Poetry; `winsdk` has no prebuilt wheels for 3.13+, which forces a source build requiring CMake/MSVC and fails on most machines)
 - ACRCloud account (for game audio fingerprinting)
 
 ## Setup
