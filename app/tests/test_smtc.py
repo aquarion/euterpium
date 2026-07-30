@@ -290,6 +290,48 @@ def test_get_smtc_track_marks_excluded_when_app_name_matches():
     assert result["excluded"] is True
 
 
+def test_get_smtc_track_marks_excluded_when_pattern_has_exe_suffix_but_name_does_not():
+    """Legacy Win32 AUMIDs (e.g. Firefox's hex AUMID) resolve to a bare friendly
+    name with no ".exe" suffix — the default ignore pattern "firefox.exe" must
+    still match against it via the exe-stem."""
+    session = _make_session(app_id="308046B0AF4A39CB")
+    manager = _make_manager(session)
+    mock_status = MagicMock()
+    mock_status.STOPPED = object()
+    mock_status.CLOSED = object()
+
+    with (
+        patch.object(smtc_module, "PYWINRT_AVAILABLE", True),
+        patch.object(smtc_module, "MediaManager", manager),
+        patch.object(smtc_module, "MediaPlaybackStatus", mock_status),
+        patch("smtc.resolve_app_name", return_value="Firefox"),
+    ):
+        result = asyncio.run(get_smtc_track(ignored_apps=["firefox.exe"]))
+
+    assert result["excluded"] is True
+    assert result["excluded_pattern"] == "firefox.exe"
+
+
+def test_get_smtc_track_bare_exe_pattern_does_not_exclude_everything():
+    """An ignore pattern of exactly ".exe" must not produce an empty exe-stem
+    that matches every app name via `"" in app_name_lower`."""
+    session = _make_session(app_id="308046B0AF4A39CB")
+    manager = _make_manager(session)
+    mock_status = MagicMock()
+    mock_status.STOPPED = object()
+    mock_status.CLOSED = object()
+
+    with (
+        patch.object(smtc_module, "PYWINRT_AVAILABLE", True),
+        patch.object(smtc_module, "MediaManager", manager),
+        patch.object(smtc_module, "MediaPlaybackStatus", mock_status),
+        patch("smtc.resolve_app_name", return_value="Spotify"),
+    ):
+        result = asyncio.run(get_smtc_track(ignored_apps=[".exe"]))
+
+    assert "excluded" not in result
+
+
 def test_get_smtc_track_not_excluded_when_no_match():
     session = _make_session(app_id="spotify.exe")
     manager = _make_manager(session)
