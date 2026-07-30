@@ -44,11 +44,11 @@ def main():
         logging.getLogger().setLevel(config.get_log_level())
     logger.info("Starting Euterpium %s", __version__)
 
-    # Report winsdk status now that logging is definitely active
-    if smtc.WINSDK_AVAILABLE:
-        logger.info("SMTC: winsdk loaded — media session detection enabled")
+    # Report winrt status now that logging is definitely active
+    if smtc.WINRT_AVAILABLE:
+        logger.info("SMTC: winrt loaded — media session detection enabled")
     else:
-        logger.warning("SMTC: winsdk not available — only game audio fingerprinting will work")
+        logger.warning("SMTC: winrt not available — only game audio fingerprinting will work")
 
     event_queue: queue.Queue = queue.Queue()
 

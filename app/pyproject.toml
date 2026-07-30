@@ -7,7 +7,7 @@ package-mode = false
 
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.13"
+python = ">=3.10,<4.0"
 numpy = ">=1.24.0"
 psutil = ">=5.9.0"
 requests = ">=2.31.0"
@@ -15,7 +15,8 @@ Pillow = ">=10.0.0"
 platformdirs = ">=4.0.0"
 soundcard = ">=0.4.2"
 pystray = ">=0.19.0"
-winsdk = { version = ">=1.0.0b10", markers = "sys_platform == 'win32'" }
+"winrt-Windows.Media" = { version = ">=3.0", markers = "sys_platform == 'win32'" }
+"winrt-Windows.Media.Control" = { version = ">=3.0", markers = "sys_platform == 'win32'" }
 win11toast = { version = ">=0.35", markers = "sys_platform == 'win32'" }
 windowsapps = { git = "https://github.com/aquarion/windowsapps" }
 flask-restx = ">=1.3"
