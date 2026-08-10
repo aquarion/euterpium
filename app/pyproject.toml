@@ -19,7 +19,7 @@ pystray = ">=0.19.0"
 "winrt-Windows.Media.Control" = { version = ">=3.2.1", markers = "sys_platform == 'win32'" }
 "winrt-Windows.Foundation" = { version = ">=3.2.1", markers = "sys_platform == 'win32'" }
 win11toast = { version = ">=0.35", markers = "sys_platform == 'win32'" }
-windowsapps = { git = "https://github.com/aquarion/windowsapps", tag = "1.0" }
+windowsapps = { git = "https://github.com/aquarion/windowsapps", tag = "1.1" }
 flask-restx = ">=1.3"
 jsonschema = ">=4.18.0"
 
