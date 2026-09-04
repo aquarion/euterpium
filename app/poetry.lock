@@ -302,14 +302,14 @@ files = [
 
 [[package]]
 name = "bc-detect-secrets"
-version = "1.5.47"
+version = "1.5.49"
 description = "Tool for detecting secrets in the codebase"
 optional = false
 python-versions = ">=3.8"
 groups = ["dev"]
 files = [
-    {file = "bc_detect_secrets-1.5.47-py3-none-any.whl", hash = "sha256:46f88c710b0fd8c5f2e54b361d793b5e1469197884da73cfc6f488b614366fc3"},
-    {file = "bc_detect_secrets-1.5.47.tar.gz", hash = "sha256:a9be28a2e564f2b19731991df39e63ae6372cc84d828ee24e50c094cbb4c154c"},
+    {file = "bc_detect_secrets-1.5.49-py3-none-any.whl", hash = "sha256:5a19c329969f9679ce40c1cf0b595d4fa749e2cc8169987ffda14da80f818484"},
+    {file = "bc_detect_secrets-1.5.49.tar.gz", hash = "sha256:74412fde2f617b61f28312f0106a9f8902be80db0084fd3d7c88f673ee707d7b"},
 ]
 
 [package.dependencies]
@@ -719,23 +719,23 @@ files = [
 
 [[package]]
 name = "checkov"
-version = "3.2.531"
+version = "3.3.11"
 description = "Infrastructure as code static analysis"
 optional = false
 python-versions = ">=3.9"
 groups = ["dev"]
 files = [
-    {file = "checkov-3.2.531-py3-none-any.whl", hash = "sha256:656b035d378f5ca26457c36cf3f9b8d0fe0cc60d3d2f8ad96676d5305946be84"},
-    {file = "checkov-3.2.531.tar.gz", hash = "sha256:869ce2a4ca2f8eb540f57e95209ca9536c4420d24aa9367dfe24c22ec4dd7328"},
+    {file = "checkov-3.3.11-py3-none-any.whl", hash = "sha256:6926fc9c4ca7cc394c8c8250cb747141be9ec2f1c1b69b294b6650d7d3b12042"},
+    {file = "checkov-3.3.11.tar.gz", hash = "sha256:1c1578a97f581791aab18c5fc9a3e17aa8e9c79f2adac8096858ce5e5df63558"},
 ]
 
 [package.dependencies]
 aiodns = ">=3.0.0,<4.0.0"
-aiohttp = ">=3.8.0,<4.0.0"
+aiohttp = ">=3.8.0,<3.15.0"
 aiomultiprocess = ">=0.9.0,<0.10.0"
 argcomplete = ">=3.0.0,<4.0.0"
 asteval = "1.0.6"
-bc-detect-secrets = "1.5.47"
+bc-detect-secrets = "1.5.49"
 bc-jsonpath-ng = "1.6.1"
 bc-python-hcl2 = "0.4.3"
 boto3 = "1.35.49"
@@ -749,6 +749,7 @@ cyclonedx-python-lib = ">=6.0.0,<8.0.0"
 docker = ">=6.0.1,<8.0.0"
 dockerfile-parse = ">=2.0.0,<3.0.0"
 dpath = "2.1.3"
+ecdsa = ">=0.19.0,<1.0.0"
 gitpython = ">=3.1.30,<4.0.0"
 importlib-metadata = ">=6.0.0,<8.0.0"
 jmespath = ">=1.0.0,<2.0.0"
@@ -1080,6 +1081,25 @@ files = [
     {file = "dpath-2.1.3-py3-none-any.whl", hash = "sha256:d9560e03ccd83b3c6f29988b0162ce9b34fd28b9d8dbda46663b20c68d9cdae3"},
     {file = "dpath-2.1.3.tar.gz", hash = "sha256:d1a7a0e6427d0a4156c792c82caf1f0109603f68ace792e36ca4596fd2cb8d9d"},
 ]
+
+[[package]]
+name = "ecdsa"
+version = "0.19.2"
+description = "ECDSA cryptographic signature library (pure python)"
+optional = false
+python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.6"
+groups = ["dev"]
+files = [
+    {file = "ecdsa-0.19.2-py2.py3-none-any.whl", hash = "sha256:840f5dc5e375c68f36c1a7a5b9caad28f95daa65185c9253c0c08dd952bb7399"},
+    {file = "ecdsa-0.19.2.tar.gz", hash = "sha256:62635b0ac1ca2e027f82122b5b81cb706edc38cd91c63dda28e4f3455a2bf930"},
+]
+
+[package.dependencies]
+six = ">=1.9.0"
+
+[package.extras]
+gmpy = ["gmpy"]
+gmpy2 = ["gmpy2"]
 
 [[package]]
 name = "exceptiongroup"
