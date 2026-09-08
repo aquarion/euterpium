@@ -302,14 +302,14 @@ files = [
 
 [[package]]
 name = "bc-detect-secrets"
-version = "1.5.49"
+version = "1.5.50"
 description = "Tool for detecting secrets in the codebase"
 optional = false
 python-versions = ">=3.8"
 groups = ["dev"]
 files = [
-    {file = "bc_detect_secrets-1.5.49-py3-none-any.whl", hash = "sha256:5a19c329969f9679ce40c1cf0b595d4fa749e2cc8169987ffda14da80f818484"},
-    {file = "bc_detect_secrets-1.5.49.tar.gz", hash = "sha256:74412fde2f617b61f28312f0106a9f8902be80db0084fd3d7c88f673ee707d7b"},
+    {file = "bc_detect_secrets-1.5.50-py3-none-any.whl", hash = "sha256:016ce9e79f692adbabcbef4a7293db427352911c3f81404a136e6f5c3e54a7f2"},
+    {file = "bc_detect_secrets-1.5.50.tar.gz", hash = "sha256:99037375d9cb49ed07e5bb12722f4bbb76fb8acaff6f367eef9df7559e7642b3"},
 ]
 
 [package.dependencies]
@@ -719,14 +719,14 @@ files = [
 
 [[package]]
 name = "checkov"
-version = "3.3.11"
+version = "3.3.16"
 description = "Infrastructure as code static analysis"
 optional = false
 python-versions = ">=3.9"
 groups = ["dev"]
 files = [
-    {file = "checkov-3.3.11-py3-none-any.whl", hash = "sha256:6926fc9c4ca7cc394c8c8250cb747141be9ec2f1c1b69b294b6650d7d3b12042"},
-    {file = "checkov-3.3.11.tar.gz", hash = "sha256:1c1578a97f581791aab18c5fc9a3e17aa8e9c79f2adac8096858ce5e5df63558"},
+    {file = "checkov-3.3.16-py3-none-any.whl", hash = "sha256:43e5383418a8b52d39747e2daaec4da4a6b7db3e2f64ab6c93f8b89c044c7665"},
+    {file = "checkov-3.3.16.tar.gz", hash = "sha256:6f7f611f45c765af9b6acd43e603a438153d86007d02dffa7903a1125f9b5089"},
 ]
 
 [package.dependencies]
@@ -735,7 +735,7 @@ aiohttp = ">=3.8.0,<3.15.0"
 aiomultiprocess = ">=0.9.0,<0.10.0"
 argcomplete = ">=3.0.0,<4.0.0"
 asteval = "1.0.6"
-bc-detect-secrets = "1.5.49"
+bc-detect-secrets = "1.5.50"
 bc-jsonpath-ng = "1.6.1"
 bc-python-hcl2 = "0.4.3"
 boto3 = "1.35.49"
