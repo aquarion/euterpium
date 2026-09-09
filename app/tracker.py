@@ -287,6 +287,13 @@ class Tracker:
                     result = detector.check()
                     self._emit("metrics", result)
                     if result.changed:
+                        if get_streaming_status() is False:
+                            self._emit(
+                                "status", "Skipping fingerprint (not streaming)"
+                            )
+                            time.sleep(POLL_INTERVAL)
+                            continue
+
                         self._emit(
                             "status", f"Audio change in {game['display_name']} — fingerprinting…"
                         )

@@ -742,6 +742,30 @@ def test_run_game_audio_change_identifies_track(
 
 
 @patch("tracker.time.sleep")
+@patch("tracker.get_streaming_status", return_value=False)
+@patch("tracker.identify_audio")
+@patch("tracker.capture_audio", return_value=b"audio")
+@patch("tracker.AudioChangeDetector")
+@patch("tracker.get_running_game", return_value={"display_name": "Game", "name": "game"})
+def test_run_game_audio_change_skips_fingerprint_when_not_streaming(
+    mock_game, mock_detector_class, mock_capture, mock_identify, mock_status, mock_sleep, loop_tracker
+):
+    """ACRCloud identify_audio must not be called (and cost money) when not streaming."""
+    mock_detector_class.return_value.check.return_value = CheckResult(changed=True, rms=0.5)
+
+    def sleep_stop(duration):
+        loop_tracker._stop_event.set()
+
+    mock_sleep.side_effect = sleep_stop
+    loop_tracker.start()
+    events = _join_and_drain(loop_tracker)
+
+    mock_capture.assert_not_called()
+    mock_identify.assert_not_called()
+    assert any(e[0] == "status" and "not streaming" in e[1] for e in events)
+
+
+@patch("tracker.time.sleep")
 @patch("tracker.AudioChangeDetector")
 @patch("tracker.get_running_game", return_value={"display_name": "Game", "name": "game"})
 def test_run_game_no_audio_change(mock_game, mock_detector_class, mock_sleep, loop_tracker):
