@@ -26,6 +26,7 @@ class Tracker:
         ("status", message_str)                   — status update
         ("delivery", message_str, level_str)      — webhook delivery status
         ("error", message_str)                    — error message
+        ("streaming_gate", is_gated_bool)          — ACRCloud fingerprinting paused/resumed
     """
 
     def __init__(self, event_queue: queue.Queue):
@@ -287,6 +288,13 @@ class Tracker:
                     result = detector.check()
                     self._emit("metrics", result)
                     if result.changed:
+                        if get_streaming_status() is False:
+                            self._emit("streaming_gate", True)
+                            self._emit("status", "Skipping fingerprint (not streaming)")
+                            time.sleep(POLL_INTERVAL)
+                            continue
+
+                        self._emit("streaming_gate", False)
                         self._emit(
                             "status", f"Audio change in {game['display_name']} — fingerprinting…"
                         )
@@ -329,6 +337,7 @@ class Tracker:
                     if prev_in_game:
                         # Game just stopped — hide the meters strip.
                         self._emit("game_stopped")
+                        self._emit("streaming_gate", False)
                         detector._last_fingerprint = None
                     prev_in_game = False
                     track = get_smtc_track_sync(ignored_apps=config.get_smtc_ignored_apps())
