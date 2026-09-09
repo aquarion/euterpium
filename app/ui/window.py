@@ -77,6 +77,9 @@ class MainWindow:
     def hide_meters(self):
         self._queue.put(("game_stopped",))
 
+    def set_streaming_gate(self, gated: bool):
+        self._queue.put(("streaming_gate", gated))
+
     def show(self):
         self._queue.put(("show",))
 
@@ -125,6 +128,10 @@ class MainWindow:
         elif kind == "game_stopped":
             self._last_metrics = None
             self._meters_frame.pack_forget()
+            self._set_streaming_gate(False)
+        elif kind == "streaming_gate":
+            _, gated = msg
+            self._set_streaming_gate(gated)
         elif kind == "show":
             self._show()
         elif kind == "hide":
@@ -184,6 +191,15 @@ class MainWindow:
             card, text="Webhook: —", font=("Segoe UI", 9), bg=BG_CARD, fg=TEXT_DIM
         )
         self._lbl_delivery.pack(anchor="w", pady=(4, 0))
+
+        self._lbl_streaming_gate = tk.Label(
+            card,
+            text="⏸ Not streaming — ACRCloud fingerprinting paused",
+            font=("Segoe UI", 9),
+            bg=BG_CARD,
+            fg=TEXT_GOLD,
+        )
+        # Hidden until the tracker reports it's skipping fingerprints
 
         self._build_meters()
 
@@ -491,6 +507,12 @@ class MainWindow:
         elif level == "error":
             color = TEXT_RED
         self._lbl_delivery.config(text=f"Webhook: {message}", fg=color)
+
+    def _set_streaming_gate(self, gated: bool):
+        if gated:
+            self._lbl_streaming_gate.pack(anchor="w", pady=(4, 0))
+        else:
+            self._lbl_streaming_gate.pack_forget()
 
     def _set_available_update(self, update_info: "AvailableUpdate | None"):
         """Show or hide the update button based on update availability."""

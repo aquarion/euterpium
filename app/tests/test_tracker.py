@@ -532,9 +532,7 @@ def test_post_now_playing_skipped_when_not_streaming(mock_post, mock_status, moc
     events = []
     while not tracker.event_queue.empty():
         events.append(tracker.event_queue.get_nowait())
-    assert any(
-        e[0] == "delivery" and "not streaming" in e[1] and e[2] == "warn" for e in events
-    )
+    assert any(e[0] == "delivery" and "not streaming" in e[1] and e[2] == "warn" for e in events)
     mock_post.assert_not_called()
 
 
@@ -739,6 +737,64 @@ def test_run_game_audio_change_identifies_track(
     events = _join_and_drain(loop_tracker)
 
     assert any(e[0] == "track" and e[1]["title"] == "Loop Track" for e in events)
+    assert any(e[0] == "streaming_gate" and e[1] is False for e in events)
+
+
+@patch("tracker.time.sleep")
+@patch("tracker.get_streaming_status", return_value=False)
+@patch("tracker.identify_audio")
+@patch("tracker.capture_audio", return_value=b"audio")
+@patch("tracker.AudioChangeDetector")
+@patch("tracker.get_running_game", return_value={"display_name": "Game", "name": "game"})
+def test_run_game_audio_change_skips_fingerprint_when_not_streaming(
+    mock_game,
+    mock_detector_class,
+    mock_capture,
+    mock_identify,
+    mock_status,
+    mock_sleep,
+    loop_tracker,
+):
+    """ACRCloud identify_audio must not be called (and cost money) when not streaming."""
+    mock_detector_class.return_value.check.return_value = CheckResult(changed=True, rms=0.5)
+
+    def sleep_stop(duration):
+        loop_tracker._stop_event.set()
+
+    mock_sleep.side_effect = sleep_stop
+    loop_tracker.start()
+    events = _join_and_drain(loop_tracker)
+
+    mock_capture.assert_not_called()
+    mock_identify.assert_not_called()
+    assert any(e[0] == "status" and "not streaming" in e[1] for e in events)
+    assert any(e[0] == "streaming_gate" and e[1] is True for e in events)
+
+
+@patch("tracker.time.sleep")
+@patch("tracker.get_smtc_track_sync", return_value=None)
+@patch("tracker.AudioChangeDetector")
+@patch("tracker.get_running_game")
+def test_run_game_stopped_clears_streaming_gate(
+    mock_game, mock_detector_class, mock_smtc, mock_sleep, loop_tracker
+):
+    mock_detector_class.return_value.check.return_value = CheckResult(changed=False, rms=0.0)
+    game = {"display_name": "Game", "name": "game"}
+    calls = {"n": 0}
+
+    def game_side_effect():
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return game
+        loop_tracker._stop_event.set()
+        return None
+
+    mock_game.side_effect = game_side_effect
+    loop_tracker.start()
+    events = _join_and_drain(loop_tracker)
+
+    assert any(e[0] == "game_stopped" for e in events)
+    assert any(e[0] == "streaming_gate" and e[1] is False for e in events)
 
 
 @patch("tracker.time.sleep")

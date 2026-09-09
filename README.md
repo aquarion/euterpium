@@ -8,7 +8,8 @@ It's loosely tied to [Stream Delta](https://github.com/aquarion/stream-delta), m
 
 - Detects music from any app registered with Windows Media Session (SMTC): Spotify, Apple Music, browsers, Windows Media Player, etc.
 - Detects game audio via WASAPI loopback + [ACRCloud](https://www.acrcloud.com/) fingerprinting — useful for games like Final Fantasy XIV whose OSTs are on streaming platforms but don't register with SMTC.
-- Posts now-playing data to a configurable API endpoint, skipping the post when the API reports that no stream is currently live.
+- Skips ACRCloud fingerprinting entirely (so it doesn't rack up API costs) when the API reports that no stream is currently live, and also skips posting now-playing data in that case.
+- Posts now-playing data to a configurable API endpoint.
 - Lives in the system tray with a settings UI.
 
 ## Requirements
