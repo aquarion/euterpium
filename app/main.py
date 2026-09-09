@@ -145,6 +145,10 @@ def main():
             elif kind == "game_stopped":
                 window.hide_meters()
 
+            elif kind == "streaming_gate":
+                _, gated = msg
+                window.set_streaming_gate(gated)
+
             elif kind == "update_checked":
                 _, update = msg
                 # Always sync tray state — clears stale "Install update" when update is None.
