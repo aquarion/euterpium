@@ -10,6 +10,8 @@ permissions: {}
 jobs:
   rebase:
     uses: istic/shared-workflows/.github/workflows/auto-rebase-dependabot.yml@main
+    secrets:
+      REBASE_TOKEN: ${{ secrets.REBASE_TOKEN }}
     permissions:
       contents: write
       pull-requests: write
