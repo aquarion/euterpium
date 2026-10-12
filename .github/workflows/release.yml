@@ -78,7 +78,7 @@ jobs:
         shell: pwsh
 
       - name: Set release version from input
-        if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
+        if: github.event_name != 'push'
         shell: pwsh
         env:
           DEPLOY_VERSION: ${{ inputs.deploy_version }}
@@ -95,7 +95,7 @@ jobs:
           echo "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
 
       - name: Test after version replacement
-        if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
+        if: github.event_name != 'push'
         working-directory: app
         run: poetry run pytest --tb=short -q
         shell: pwsh
@@ -182,7 +182,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish release
-        if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
+        if: github.event_name != 'push'
         run: gh release edit ${{ env.RELEASE_TAG }} --draft=false --latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
