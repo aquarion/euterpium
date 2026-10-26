@@ -1,5 +1,11 @@
 AddonId: EuterpiumExporter_a1b2c3d4-e5f6-7890-abcd-ef1234567890
 Packages:
+  - Version: 3.4.3
+    RequiredApiVersion: 6.0.0
+    ReleaseDate: 2026-10-26
+    PackageUrl: https://github.com/aquarion/euterpium/releases/download/v3.4.3/EuterpiumExporter_a1b2c3d4-e5f6-7890-abcd-ef1234567890_3_4_3.pext
+    Changelog:
+      - See https://github.com/aquarion/euterpium/releases/tag/v3.4.3
   - Version: 3.4.2
     RequiredApiVersion: 6.0.0
     ReleaseDate: 2026-10-19
