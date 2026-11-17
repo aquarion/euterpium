@@ -840,14 +840,14 @@ files = [
 
 [[package]]
 name = "checkov"
-version = "3.4.3"
+version = "3.4.5"
 description = "Infrastructure as code static analysis"
 optional = false
-python-versions = ">=3.9"
+python-versions = ">=3.10"
 groups = ["dev"]
 files = [
-    {file = "checkov-3.4.3-py3-none-any.whl", hash = "sha256:666f376019f6a9fdbeb5c9d2a57be3fb83a4acd2d924d447942450a926ba0f55"},
-    {file = "checkov-3.4.3.tar.gz", hash = "sha256:2513d366c9b6bec3b91528faa6095b410be5f940277833771b427a6a56134915"},
+    {file = "checkov-3.4.5-py3-none-any.whl", hash = "sha256:64210c48a957ecb85dfb38057e00faa150b5e46e76b08e710d29beb687b7ced2"},
+    {file = "checkov-3.4.5.tar.gz", hash = "sha256:c4e38f5781482426981edc626bbeb7c37b850be2ac3a03723b2f99da52a3bc52"},
 ]
 
 [package.dependencies]
